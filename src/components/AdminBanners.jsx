@@ -1,68 +1,10 @@
-import React, { useState } from 'react';
-import banner1 from '../assets/hero-bg.png';
-import banner2 from '../assets/about-banner-bg.png';
-import banner3 from '../assets/banner.png';
-
-const initialBannersList = [
-  {
-    id: 1,
-    sNo: 1,
-    title: 'A Market leader in FRP pressure vessels for water purification',
-    description: 'Welcome to UKL Instruments. High-pressure FRP membrane housings engineered for 300 to 1200 PSI.',
-    linkUrl: 'https://uklinstruments.com/products',
-    img: banner1,
-    fileName: 'hero-bg.png',
-    pageName: 'Homepage Hero Slider',
-    status: 'Active',
-  },
-  {
-    id: 2,
-    sNo: 2,
-    title: 'About Us Ocean Banner',
-    description: 'Leading OEM Water Treatment Solutions across India and global markets.',
-    linkUrl: 'https://uklinstruments.com/about',
-    img: banner2,
-    fileName: 'about-banner-bg.png',
-    pageName: 'About Page Banner',
-    status: 'Active',
-  },
-  {
-    id: 3,
-    sNo: 3,
-    title: 'High-Strength FRP Membrane Vessels',
-    description: 'Engineered for 300 to 1200 PSI Pressure Ratings with mirror finish inner diameter.',
-    linkUrl: '',
-    img: banner3,
-    fileName: 'banner.png',
-    pageName: 'Product Range Slider',
-    status: 'Active',
-  },
-  {
-    id: 4,
-    sNo: 4,
-    title: 'ASME Section X Certified Manufacturing Facility',
-    description: 'Uncompromising Quality & Burst Pressure Testing for reverse osmosis plants.',
-    linkUrl: 'https://uklinstruments.com/quality',
-    img: banner1,
-    fileName: 'hero-bg.png',
-    pageName: 'Quality Page Banner',
-    status: 'Active',
-  },
-  {
-    id: 5,
-    sNo: 5,
-    title: 'Global Export Quality FRP Pressure Vessels',
-    description: 'Trusted by Industrial RO Operators Worldwide in UAE, Oman, and USA.',
-    linkUrl: '',
-    img: banner2,
-    fileName: 'about-banner-bg.png',
-    pageName: 'Homepage Hero Slider',
-    status: 'Inactive',
-  }
-];
+import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 
 const AdminBanners = () => {
-  const [banners, setBanners] = useState(initialBannersList);
+  const [banners, setBanners] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   
   // View mode: 'list' (shows table view) or 'form' (shows inline form)
   const [currentView, setCurrentView] = useState('list');
@@ -73,33 +15,72 @@ const AdminBanners = () => {
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
 
   // Default Form State
   const defaultFormData = {
     title: '',
-    pageName: '',
+    pageName: 'Home Page',
     linkUrl: '',
     status: 'Active',
     description: '',
-    img: banner1,
+    img: '',
     fileName: 'No file chosen',
   };
 
   const [formData, setFormData] = useState(defaultFormData);
 
+  // Fetch Banners from API
+  const fetchBanners = async () => {
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_BASE}/api/admin/banners`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        const mapped = data.banners.map((item, index) => ({
+          id: item._id,
+          sNo: index + 1,
+          title: item.title || '',
+          pageName: item.pageName || 'Home Page',
+          status: item.status || 'Active',
+          img: item.image ? `${API_BASE}${item.image}` : '',
+          fileName: item.image ? item.image.split('/').pop() : '',
+          description: item.description || '',
+          linkUrl: item.linkUrl || '',
+          order: item.order || 0
+        }));
+        setBanners(mapped);
+      } else {
+        setErrorMsg(data.message || 'Failed to load banners.');
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Failed to connect to the backend server.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBanners();
+  }, []);
+
   // Handle File Input Change
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData({
-          ...formData,
-          img: reader.result,
-          fileName: file.name
-        });
-      };
-      reader.readAsDataURL(file);
+      setSelectedFile(file);
+      setFormData({
+        ...formData,
+        fileName: file.name,
+        img: URL.createObjectURL(file) // local preview URL
+      });
     }
   };
 
@@ -107,9 +88,9 @@ const AdminBanners = () => {
   const filteredBanners = banners.filter(item => {
     const term = searchTerm.toLowerCase();
     return (
-      item.title.toLowerCase().includes(term) ||
+      (item.title && item.title.toLowerCase().includes(term)) ||
       (item.description && item.description.toLowerCase().includes(term)) ||
-      item.pageName.toLowerCase().includes(term)
+      (item.pageName && item.pageName.toLowerCase().includes(term))
     );
   });
 
@@ -120,50 +101,135 @@ const AdminBanners = () => {
   const endIndex = Math.min(currentPage * entriesPerPage, totalEntries);
   const currentSlice = filteredBanners.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage);
 
+  const getPageNumbers = () => {
+    const pages = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push('...');
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      for (let i = start; i <= end; i++) {
+        if (!pages.includes(i)) pages.push(i);
+      }
+      if (currentPage < totalPages - 2) pages.push('...');
+      if (!pages.includes(totalPages)) pages.push(totalPages);
+    }
+    return pages;
+  };
+
+  const [deletingBannerId, setDeletingBannerId] = useState(null);
+
   const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this banner?')) {
-      const updated = banners.filter(b => b.id !== id).map((item, idx) => ({ ...item, sNo: idx + 1 }));
-      setBanners(updated);
+    setDeletingBannerId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_BASE}/api/admin/banners/${deletingBannerId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setDeletingBannerId(null);
+        fetchBanners();
+      } else {
+        alert(data.message || 'Failed to delete banner');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error deleting banner.');
     }
   };
 
   const handleOpenAddForm = () => {
     setFormData(defaultFormData);
+    setSelectedFile(null);
     setEditingBanner(null);
     setCurrentView('form');
   };
 
   const handleEdit = (item) => {
     setEditingBanner(item);
+    setSelectedFile(null);
     setFormData({
-      ...defaultFormData,
-      ...item,
+      title: item.title,
+      pageName: item.pageName,
+      linkUrl: item.linkUrl || '',
+      status: item.status,
+      description: item.description || '',
+      img: item.img,
       fileName: item.fileName || 'banner_image.png'
     });
     setCurrentView('form');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingBanner) {
-      setBanners(banners.map(b => b.id === editingBanner.id ? { ...formData, id: editingBanner.id, sNo: editingBanner.sNo } : b));
-    } else {
-      const newBanner = {
-        ...formData,
-        id: Date.now(),
-        sNo: banners.length + 1
-      };
-      setBanners([newBanner, ...banners]);
+    setLoading(true);
+    setErrorMsg('');
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      const bodyFormData = new FormData();
+      bodyFormData.append('title', formData.title);
+      bodyFormData.append('pageName', formData.pageName);
+      bodyFormData.append('status', formData.status);
+      bodyFormData.append('linkUrl', formData.linkUrl);
+      bodyFormData.append('description', formData.description);
+
+      if (selectedFile) {
+        bodyFormData.append('image', selectedFile);
+      } else if (!editingBanner) {
+        setErrorMsg('Please select a banner image file.');
+        setLoading(false);
+        return;
+      }
+
+      let url = `${API_BASE}/api/admin/banners`;
+      let method = 'POST';
+
+      if (editingBanner) {
+        url = `${API_BASE}/api/admin/banners/${editingBanner.id}`;
+        method = 'PUT';
+      }
+
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: bodyFormData
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setCurrentView('list');
+        setEditingBanner(null);
+        setFormData(defaultFormData);
+        setSelectedFile(null);
+        fetchBanners();
+      } else {
+        setErrorMsg(data.message || 'Failed to save banner');
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Server connection error during save.');
+    } finally {
+      setLoading(false);
     }
-    setCurrentView('list');
-    setEditingBanner(null);
-    setFormData(defaultFormData);
   };
 
   return (
     <div className="banners-module">
       
-      {/* 1. Header Bar matching user's screenshot */}
+      {/* Header Bar */}
       <div className="banner-list-header-bar">
         <h2 className="banner-header-title">Banner List</h2>
         
@@ -178,13 +244,15 @@ const AdminBanners = () => {
         )}
       </div>
 
+      {errorMsg && <div className="login-error-alert" style={{ margin: '15px 0' }}>{errorMsg}</div>}
+
       {/* =========================================================================
-          VIEW MODE 1: TABLE LIST VIEW (Columns: S.No, Media, Page Name, Status, Action)
+          VIEW MODE 1: TABLE LIST VIEW
          ========================================================================= */}
       {currentView === 'list' && (
         <div className="blog-post-card-container">
           
-          {/* Table Controls (Show entries & Search) */}
+          {/* Table Controls */}
           <div className="table-controls-row">
             <div className="entries-selector-group">
               <label>Show</label>
@@ -212,7 +280,7 @@ const AdminBanners = () => {
             </div>
           </div>
 
-          {/* Banner Data Table: S.No, Media, Page Name, Status, Action */}
+          {/* Banner Data Table */}
           <div className="blog-post-table-wrapper">
             <table className="blog-post-table banner-table-styled">
               <thead>
@@ -225,7 +293,13 @@ const AdminBanners = () => {
                 </tr>
               </thead>
               <tbody>
-                {currentSlice.length === 0 ? (
+                {loading && banners.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="no-records-cell" style={{ textAlign: 'center' }}>
+                      Loading banners from server...
+                    </td>
+                  </tr>
+                ) : currentSlice.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="no-records-cell" style={{ textAlign: 'center' }}>
                       No matching banners found
@@ -236,7 +310,11 @@ const AdminBanners = () => {
                     <tr key={item.id}>
                       <td className="sno-cell" style={{ textAlign: 'center' }}>{item.sNo}</td>
                       <td className="thumbnail-cell" style={{ textAlign: 'center' }}>
-                        <img src={item.img} alt={item.pageName} className="table-thumb-img banner-media-preview" style={{ display: 'inline-block' }} />
+                        {item.img ? (
+                          <img src={item.img} alt={item.pageName} className="table-thumb-img banner-media-preview" style={{ display: 'inline-block' }} />
+                        ) : (
+                          <span style={{ fontSize: '12px', color: '#64748b' }}>No Image</span>
+                        )}
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         <span className="page-name-tag">{item.pageName}</span>
@@ -293,9 +371,19 @@ const AdminBanners = () => {
                 Prev
               </button>
 
-              <button className="page-nav-btn active">
-                {currentPage}
-              </button>
+              {getPageNumbers().map((page, idx) => (
+                page === '...' ? (
+                  <span key={`dots-${idx}`} className="page-nav-btn dots">...</span>
+                ) : (
+                  <button
+                     key={page}
+                     className={`page-nav-btn ${currentPage === page ? 'active' : ''}`}
+                     onClick={() => setCurrentPage(page)}
+                  >
+                     {page}
+                  </button>
+                )
+              ))}
 
               <button 
                 className="page-nav-btn"
@@ -344,16 +432,15 @@ const AdminBanners = () => {
                   onChange={(e) => setFormData({ ...formData, pageName: e.target.value })}
                   required
                 >
-                  <option value="">Select Page</option>
-                  <option value="Homepage Hero Slider">Homepage Hero Slider</option>
-                  <option value="About Page Banner">About Page Banner</option>
-                  <option value="Product Range Slider">Product Range Slider</option>
-                  <option value="Quality Page Banner">Quality Page Banner</option>
+                  <option value="Home Page">Home Page</option>
+                  <option value="Products Page">Products Page</option>
+                  <option value="About Page">About Page</option>
+                  <option value="Contact Page">Contact Page</option>
                 </select>
               </div>
             </div>
 
-            {/* Row 2: Link (Optional) & Status * (Active or Inactive) */}
+            {/* Row 2: Link (Optional) & Status * */}
             <div className="form-row-2col">
               <div className="form-group">
                 <label>Link (Optional)</label>
@@ -389,14 +476,14 @@ const AdminBanners = () => {
               />
             </div>
 
-            {/* Row 4: Banner Image / Video * */}
+            {/* Row 4: Banner Image */}
             <div className="form-group">
-              <label>Banner Image / Video <span className="req-star">*</span></label>
+              <label>Banner Image <span className="req-star">*</span></label>
               <div className="custom-file-upload-box">
                 <input
                   type="file"
                   id="bannerMediaFileInput"
-                  accept="image/*,video/*"
+                  accept="image/*"
                   onChange={handleFileChange}
                   className="hidden-file-input"
                 />
@@ -410,13 +497,13 @@ const AdminBanners = () => {
               </div>
             </div>
 
-            {/* Form Action Buttons (Cancel & Save at Bottom Right) */}
+            {/* Form Action Buttons */}
             <div className="modal-actions banner-form-actions-right">
-              <button type="button" className="btn-cancel-outline" onClick={() => setCurrentView('list')}>
+              <button type="button" className="btn-cancel-outline" onClick={() => setCurrentView('list')} disabled={loading}>
                 Cancel
               </button>
-              <button type="submit" className="btn-save-banner-filled">
-                Save
+              <button type="submit" className="btn-save-banner-filled" disabled={loading}>
+                {loading ? 'Saving...' : 'Save'}
               </button>
             </div>
 
@@ -425,7 +512,7 @@ const AdminBanners = () => {
       )}
 
       {/* =========================================================================
-          VIEW BANNER DETAILS MODAL (Read-Only Preview when Eye 👁️ is clicked)
+          VIEW BANNER DETAILS MODAL
          ========================================================================= */}
       {viewingBanner && (
         <div className="admin-modal-overlay">
@@ -436,11 +523,13 @@ const AdminBanners = () => {
             </div>
 
             <div className="banner-details-view-box" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <img 
-                src={viewingBanner.img} 
-                alt={viewingBanner.title} 
-                style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #e2e8f0' }} 
-              />
+              {viewingBanner.img && (
+                <img 
+                  src={viewingBanner.img} 
+                  alt={viewingBanner.title} 
+                  style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #e2e8f0' }} 
+                />
+              )}
               
               <div className="form-row-2col">
                 <div>
@@ -493,7 +582,73 @@ const AdminBanners = () => {
         </div>
       )}
 
-      {/* Floating Scroll-to-Top Button */}
+      {/* CUSTOM DELETE CONFIRMATION POPUP MODAL */}
+      {deletingBannerId && (
+        <div className="admin-modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="admin-modal" style={{ maxWidth: '420px', padding: '28px 24px', textAlign: 'center', borderRadius: '16px' }}>
+            <div style={{ 
+              width: '60px', 
+              height: '60px', 
+              borderRadius: '50%', 
+              background: '#fef2f2', 
+              color: '#ef4444', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              margin: '0 auto 16px auto',
+              border: '1px solid #fee2e2',
+              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
+            }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M3 6h18" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
+              </svg>
+            </div>
+
+            <h3 style={{ fontSize: '19px', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
+              Confirm Delete
+            </h3>
+
+            <p style={{ fontSize: '14px', color: '#64748b', lineHeight: '1.5', marginBottom: '24px' }}>
+              Are you sure you want to delete this banner? This action cannot be undone.
+            </p>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button 
+                type="button" 
+                className="btn-cancel-outline" 
+                onClick={() => setDeletingBannerId(null)}
+                style={{ flex: 1, padding: '10px 16px', borderRadius: '8px', fontWeight: 600 }}
+              >
+                Cancel
+              </button>
+
+              <button 
+                type="button" 
+                onClick={handleConfirmDelete}
+                style={{ 
+                  flex: 1, 
+                  padding: '10px 16px', 
+                  background: '#dc2626', 
+                  color: '#ffffff', 
+                  border: 'none', 
+                  borderRadius: '8px', 
+                  fontWeight: 700, 
+                  fontSize: '14px', 
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.25)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <button 
         className="floating-scroll-top-btn"
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}

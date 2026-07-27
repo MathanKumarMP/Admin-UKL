@@ -1,19 +1,21 @@
-/* ==========================================================================
-   UKL Admin Control Panel - Premium Light SaaS Theme & Top Navigation Bar
-   ========================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-* {
+*, *::before, *::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body, html, input, select, textarea, button, table, th, td, div, span, label, a, h1, h2, h3, h4, h5, h6, p {
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   background-color: #f8fafc;
   color: #0f172a;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 .admin-app-container {
@@ -1104,11 +1106,12 @@ body {
 }
 
 .slug-cell {
-  color: #718096;
-  font-family: monospace;
-  font-size: 12px;
-  max-width: 180px;
-  word-break: break-all;
+  color: #64748b;
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 12.5px;
+  font-weight: 500;
+  max-width: 200px;
+  word-break: break-word;
 }
 
 .table-thumb-img {
@@ -1640,7 +1643,7 @@ body {
 
 /* Inline Form Container & Header Styling */
 .inline-form-container {
-  padding: 28px 32px !important;
+  padding: 28px 70px !important;
   background-color: #ffffff;
   border-radius: 14px;
   border: 1px solid #e2e8f0;
@@ -1837,4 +1840,506 @@ body {
   color: #ffffff !important;
   border-color: transparent !important;
   font-weight: 700;
+}
+
+/* ==========================================================================
+   ADMIN LOGIN SCREEN STYLES (MATCHING USER SCREENSHOT WITH UKL THEME COLORS)
+   ========================================================================== */
+.admin-login-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  background: linear-gradient(135deg, #0f172a 0%, #004dad 50%, #0f172a 100%);
+  background-size: cover;
+  background-position: center;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
+}
+
+.login-bg-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at center, rgba(0, 77, 173, 0.4) 0%, rgba(15, 23, 42, 0.85) 100%);
+  backdrop-filter: blur(8px);
+}
+
+.login-card-box {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 440px;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 36px 32px 28px 32px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  text-align: center;
+  animation: loginCardFadeIn 0.5s ease-out forwards;
+}
+
+@keyframes loginCardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.login-header-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.login-logo-badge {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #004dad 0%, #4BAD49 100%);
+  padding: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  box-shadow: 0 6px 16px rgba(0, 77, 173, 0.25);
+}
+
+.login-logo-img {
+  width: 100%;
+  height: 100%;
+  background: #ffffff;
+  border-radius: 13px;
+  padding: 6px;
+  object-fit: contain;
+}
+
+.login-brand-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #004dad;
+  letter-spacing: -0.2px;
+  margin: 0 0 2px 0;
+}
+
+.login-main-heading {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 6px 0;
+}
+
+.login-subtitle {
+  font-size: 13.5px;
+  color: #64748b;
+  margin: 0;
+  font-weight: 500;
+}
+
+.login-error-alert {
+  background-color: #fef2f2;
+  border: 1px solid #fee2e2;
+  color: #ef4444;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  text-align: left;
+}
+
+.login-field-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 6px;
+}
+
+.login-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.login-input-wrapper .input-icon {
+  position: absolute;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.login-input-field {
+  width: 100%;
+  height: 48px;
+  background-color: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0 42px 0 44px;
+  font-size: 14px;
+  color: #0f172a;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.login-input-field:focus {
+  background-color: #ffffff;
+  border-color: #004dad;
+  box-shadow: 0 0 0 4px rgba(0, 77, 173, 0.12);
+  outline: none;
+}
+
+.toggle-password-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.forgot-password-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.forgot-password-btn {
+  background: none;
+  border: none;
+  color: #004dad;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s ease;
+}
+
+.forgot-password-btn:hover {
+  color: #4BAD49;
+  text-decoration: underline;
+}
+
+.login-submit-btn {
+  width: 100%;
+  height: 48px;
+  background: linear-gradient(135deg, #004dad 0%, #4BAD49 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 77, 173, 0.3);
+  transition: all 0.25s ease;
+  margin-top: 6px;
+}
+
+.login-submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 77, 173, 0.4);
+}
+
+.login-submit-btn:active {
+  transform: translateY(0);
+}
+
+.login-footer-credits {
+  margin-top: 24px;
+  font-size: 12.5px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   6. News/Blog Module 2-Column Grid Form Layout Styles
+   ========================================================================== */
+.form-fields-main-layout {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 30px;
+  align-items: start;
+  margin-top: 10px;
+}
+
+.form-main-fields-col,
+.form-meta-settings-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* SEO Fieldset styling */
+.seo-meta-fieldset {
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 20px;
+  background-color: #f8fafc;
+  margin-top: 15px;
+}
+
+.seo-meta-fieldset legend {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #004dad;
+  padding: 0 10px;
+}
+
+/* Dropzone for Thumbnail upload */
+.thumbnail-upload-dropzone {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  border: 2px dashed #cbd5e1;
+  padding: 20px;
+  border-radius: 12px;
+  background-color: #f8fafc;
+  align-items: center;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.thumbnail-upload-dropzone:hover {
+  border-color: #004dad;
+  background-color: #f0f9ff;
+}
+
+.dropzone-media-preview-container {
+  width: 100%;
+  height: 160px;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dropzone-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dropzone-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-choose-file-tag {
+  background-color: #004dad;
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-block;
+  transition: background-color 0.2s ease;
+}
+
+.btn-choose-file-tag:hover {
+  background-color: #00367a;
+}
+
+.file-name-indicator-span {
+  font-size: 12px;
+  color: #64748b;
+  word-break: break-all;
+}
+
+/* Multiselect checkboxes for tags selection */
+.tags-checkbox-multi-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border: 1px solid #cbd5e1;
+  padding: 12px;
+  border-radius: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+  background-color: #ffffff;
+}
+
+.checkbox-pill-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.checkbox-pill-label:hover {
+  background-color: #e2e8f0;
+}
+
+.checkbox-pill-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Switches styling */
+.inline-switches-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.switch-container-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.switch-container-label input[type="checkbox"] {
+  display: none;
+}
+
+.slider-switch-span {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 20px;
+  background-color: #cbd5e1;
+  border-radius: 20px;
+  transition: background-color 0.2s ease;
+}
+
+.slider-switch-span::before {
+  content: "";
+  position: absolute;
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.switch-container-label input[type="checkbox"]:checked + .slider-switch-span {
+  background-color: #4BAD49;
+}
+
+.switch-container-label input[type="checkbox"]:checked + .slider-switch-span::before {
+  transform: translateX(18px);
+}
+
+.switch-text-label {
+  color: #334155;
+}
+
+/* Sticky Form Actions Bar */
+.form-actions-sticky-bar {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 20px;
+  margin-top: 30px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Media Query for responsiveness */
+@media (max-width: 900px) {
+  .form-fields-main-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+/* Rich Text Editor Formatting Toolbar and Box Styles */
+.text-editor-rich-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-bottom: none;
+  padding: 8px 12px;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  align-items: center;
+}
+
+.text-editor-rich-toolbar button {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  min-width: 28px;
+  height: 28px;
+}
+
+.text-editor-rich-toolbar button:hover {
+  background-color: #e2e8f0;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.content-editable-rich-editor {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border: 1px solid #cbd5e1 !important;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: #0f172a;
+  background-color: #ffffff;
+}
+
+.content-editable-rich-editor:focus {
+  border-color: #004dad !important;
+  box-shadow: 0 0 0 3px rgba(0, 77, 173, 0.12);
+  outline: none;
+}
+
+.editor-word-count-bar {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 6px;
+  text-align: right;
+  font-weight: 500;
 }

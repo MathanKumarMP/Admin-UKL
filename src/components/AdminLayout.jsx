@@ -5,7 +5,7 @@ import AdminGallery from './AdminGallery';
 import AdminNews from './AdminNews';
 import AdminEnquiries from './AdminEnquiries';
 
-const AdminLayout = () => {
+const AdminLayout = ({ onLogout }) => {
   const [activeModule, setActiveModule] = useState('banners');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -47,7 +47,6 @@ const AdminLayout = () => {
     {
       id: 'enquiries',
       label: 'Enquiry',
-      badge: '12',
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
@@ -82,11 +81,7 @@ const AdminLayout = () => {
             <div className="brand-logo-wrapper">
               <img src={logo} alt="UKL Admin Logo" className="brand-logo-img" />
             </div>
-            <div className="brand-name-group">
-              <span className="brand-title">UKL Admin</span>
-              <span className="brand-subtitle">Control Panel</span>
-            </div>
-            <div className="brand-vertical-divider"></div>
+            
           </div>
 
           {/* Center Horizontal Navigation Bar */}
@@ -179,7 +174,7 @@ const AdminLayout = () => {
                     <p className="user-full-name">UKL Admin Panel</p>
                     <p className="user-email">admin@uklinstruments.com</p>
                   </div>
-                  <button className="menu-item-btn danger" onClick={() => alert('Logout clicked')}>
+                  <button className="menu-item-btn danger" onClick={onLogout}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
                     Log Out
                   </button>

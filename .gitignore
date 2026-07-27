@@ -7,34 +7,25 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Dependency directories
-node_modules/
-jspm_packages/
-web_modules/
+# Diagnostic & IDE directories
+.antigravity
+.gemini
+.agents
 
-# Production build output
-dist/
-dist-ssr/
-build/
+# Node dependencies & Build outputs
+node_modules
+dist
+dist-ssr
+*.local
 
-# Local environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# IDE & OS files
-.vscode/
-.idea/
+# Editor directories and OS files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
 *.suo
-*.ntvs*
+*.ntvsca
 *.njsproj
 *.sln
 *.sw?
-.DS_Store
-Thumbs.db
-
-# Vite cache & temp files
-.vite/
-*.local

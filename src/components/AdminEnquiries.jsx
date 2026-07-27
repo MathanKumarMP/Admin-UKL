@@ -1,151 +1,276 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../config';
 
 const AdminEnquiries = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [selectedEnquiry, setSelectedEnquiry] = useState(null);
+  const [viewingEnquiry, setViewingEnquiry] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [entriesPerPage, setEntriesPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const [enquiries, setEnquiries] = useState([
-    {
-      id: 'ENQ-1048',
-      name: 'Rajesh Kumar',
-      email: 'rajesh@watertech.com',
-      phone: '+91 98450 12345',
-      date: '25 Jul 2026',
-      source: 'Get In Touch Form',
-      productInterest: '8 Housing Side Port (80SP1200)',
-      message: 'We require quotation and technical datasheet for 12 units of 80SP1200 side-entry FRP pressure vessels for our upcoming industrial RO plant project in Gujarat.',
-      status: 'unread',
-    },
-    {
-      id: 'ENQ-1047',
-      name: 'Ananya Sharma',
-      email: 'ananya@hydroclean.in',
-      phone: '+91 97110 88765',
-      date: '24 Jul 2026',
-      source: 'Enquire Now Button',
-      productInterest: '4 Housing End Port (40EP600)',
-      message: 'Please send pricing and delivery timeline for 20 pieces of 4 inch 600 PSI end entry membrane housings.',
-      status: 'replied',
-    },
-    {
-      id: 'ENQ-1046',
-      name: 'Michael Vance',
-      email: 'm.vance@globalpurification.org',
-      phone: '+1 415 555 0192',
-      date: '23 Jul 2026',
-      source: 'ASME Section Brochure Download',
-      productInterest: 'ASME Section X Certified Vessels',
-      message: 'Interested in ASME Section X certified 8 inch vessels for seawater desalination project in UAE. Please provide ASME documentation.',
-      status: 'pending',
-    },
-    {
-      id: 'ENQ-1045',
-      name: 'Suresh Menon',
-      email: 'suresh@chennaifilters.com',
-      phone: '+91 94440 33210',
-      date: '22 Jul 2026',
-      source: 'Get In Touch Form',
-      productInterest: '8 Housing End Port (80EP450)',
-      message: 'We need spare end plug seals and quick lock retention rings for UKL 80EP model.',
-      status: 'replied',
-    },
-  ]);
+  const [enquiries, setEnquiries] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const filteredEnquiries = enquiries.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          item.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          item.message.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || item.status === statusFilter.toLowerCase();
-    return matchesSearch && matchesStatus;
-  });
-
-  const handleUpdateStatus = (id, newStatus) => {
-    setEnquiries(enquiries.map(item => item.id === id ? { ...item, status: newStatus } : item));
-    if (selectedEnquiry && selectedEnquiry.id === id) {
-      setSelectedEnquiry({ ...selectedEnquiry, status: newStatus });
+  // Fetch Enquiries from API
+  const fetchEnquiries = async () => {
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      const token = localStorage.getItem('adminToken');
+      // Fetch all entries from backend admin route
+      const response = await fetch(`${API_BASE}/api/admin/enquiries?limit=1000`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        const mapped = data.enquiries.map((item, index) => ({
+          id: item._id,
+          sNo: index + 1,
+          name: item.name,
+          email: item.email,
+          phone: item.phone,
+          date: new Date(item.createdAt).toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+          }),
+          message: item.message,
+          status: item.status
+        }));
+        setEnquiries(mapped);
+      } else {
+        setErrorMsg(data.message || 'Failed to fetch enquiries.');
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Failed to connect to backend server.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleExportCSV = () => {
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + ["SNo,Date,Name,Email,Phone,Product,Status", ...enquiries.map((e, idx) => `${idx + 1},${e.date},"${e.name}",${e.email},${e.phone},"${e.productInterest}",${e.status}`)].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `UKL_Enquiries_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  useEffect(() => {
+    fetchEnquiries();
+  }, []);
+
+  const filteredEnquiries = enquiries.filter(item =>
+    (item.name && item.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (item.email && item.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (item.phone && item.phone.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (item.message && item.message.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  // Pagination Calculations
+  const totalEntries = filteredEnquiries.length;
+  const totalPages = Math.ceil(totalEntries / entriesPerPage) || 1;
+  const startIndex = totalEntries > 0 ? (currentPage - 1) * entriesPerPage + 1 : 0;
+  const endIndex = Math.min(currentPage * entriesPerPage, totalEntries);
+  const currentSlice = filteredEnquiries.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage);
+
+  const getPageNumbers = () => {
+    const pages = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push('...');
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      for (let i = start; i <= end; i++) {
+        if (!pages.includes(i)) pages.push(i);
+      }
+      if (currentPage < totalPages - 2) pages.push('...');
+      if (!pages.includes(totalPages)) pages.push(totalPages);
+    }
+    return pages;
+  };
+
+  // Download Excel (.xlsx format) via real backend excel generator
+  const handleExportExcel = async () => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_BASE}/api/admin/enquiries/export/excel`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `UKL_Customer_Enquiries_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to generate Excel export.');
+    }
+  };
+
+  const handleDelete = (id) => {
+    setDeletingId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_BASE}/api/admin/enquiries/${deletingId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setDeletingId(null);
+        fetchEnquiries();
+      } else {
+        alert(data.message || 'Failed to delete enquiry');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error deleting enquiry.');
+    }
   };
 
   return (
     <div className="enquiries-module">
       
-      {/* Header Bar */}
+      {/* Header Bar matching UKL Theme */}
       <div className="banner-list-header-bar">
         <div>
           <h2 className="banner-header-title">Customer Enquiries Management</h2>
+          <span className="header-subtitle-info">View, manage and download customer enquiries into Excel.</span>
         </div>
 
-        <button className="btn-save-banner-filled" onClick={handleExportCSV}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '6px' }}><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-          Export Enquiries (CSV)
-        </button>
+        <div>
+          <button 
+            className="btn-excel-export" 
+            onClick={handleExportExcel}
+            style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              background: '#107c41', 
+              color: '#ffffff', 
+              border: 'none', 
+              padding: '10px 18px', 
+              borderRadius: '8px', 
+              fontWeight: '700', 
+              fontSize: '13.5px', 
+              cursor: 'pointer', 
+              boxShadow: '0 2px 6px rgba(16,124,65,0.25)',
+              transition: 'all 0.2s ease'
+            }}
+            title="Download Enquiries in Microsoft Excel format"
+          >
+            <svg 
+              width="16" 
+              height="16" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2.5" 
+              style={{ marginRight: '6px' }}
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Export to Excel
+          </button>
+        </div>
       </div>
 
-      {/* Filter & Search Controls Box */}
+      {errorMsg && <div className="login-error-alert" style={{ margin: '15px 0' }}>{errorMsg}</div>}
+
+      {/* =========================================================================
+          VIEW MODE 1: TABLE LIST VIEW
+         ========================================================================= */}
       <div className="blog-post-card-container">
         
-        <div className="table-controls-row" style={{ marginBottom: '18px' }}>
-          <div className="table-search-group" style={{ flex: 1, maxWidth: '360px' }}>
+        {/* Table Controls (Show entries & Search) */}
+        <div className="table-controls-row">
+          <div className="entries-selector-group">
+            <label>Show</label>
+            <select 
+              value={entriesPerPage} 
+              onChange={(e) => { setEntriesPerPage(Number(e.target.value)); setCurrentPage(1); }}
+              className="entries-select-dropdown"
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+            <label>entries</label>
+          </div>
+
+          <div className="table-search-group">
             <label>Search:</label>
             <input
               type="text"
               className="search-input-field"
-              placeholder="Search by Name, Email or Message..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ width: '100%' }}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             />
           </div>
-
-         
         </div>
 
-        {/* Enquiries Data Table: S.No, Date, Customer Name, Email, Phone, Action (Delete only) */}
+        {/* Enquiries Table */}
         <div className="blog-post-table-wrapper">
-          <table className="blog-post-table enquiry-table-styled">
+          <table className="blog-post-table enquiries-table-styled">
             <thead>
               <tr>
-                <th style={{ width: '70px', textAlign: 'center' }}>S.No</th>
-                <th style={{ width: '120px', textAlign: 'center' }}>Date</th>
-                <th style={{ textAlign: 'left' }}>Customer Name</th>
-                <th style={{ textAlign: 'left' }}>Email</th>
-                <th style={{ textAlign: 'center' }}>Phone</th>
-                <th style={{ width: '90px', textAlign: 'center' }}>Action</th>
+                <th style={{ width: '80px', textAlign: 'center' }}>S.No</th>
+                <th style={{ width: '130px', textAlign: 'center' }}>Date</th>
+                <th style={{ width: '160px', textAlign: 'center' }}>Customer Name</th>
+                <th style={{ width: '160px', textAlign: 'center' }}>Phone Number</th>
+                <th style={{ width: '180px', textAlign: 'center' }}>Email</th>
+                <th style={{ textAlign: 'center' }}>Description</th>
+                <th style={{ width: '100px', textAlign: 'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              {filteredEnquiries.length === 0 ? (
+              {loading && enquiries.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="no-records-cell" style={{ textAlign: 'center' }}>
-                    No customer enquiries found
+                  <td colSpan="7" className="no-records-cell" style={{ textAlign: 'center' }}>
+                    Loading customer enquiries...
+                  </td>
+                </tr>
+              ) : currentSlice.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="no-records-cell" style={{ textAlign: 'center' }}>
+                    No matching enquiries found
                   </td>
                 </tr>
               ) : (
-                filteredEnquiries.map((item, index) => (
+                currentSlice.map((item) => (
                   <tr key={item.id}>
-                    <td className="sno-cell" style={{ textAlign: 'center' }}>{index + 1}</td>
-                    <td style={{ textAlign: 'center', color: '#64748b' }}>{item.date}</td>
-                    <td style={{ fontWeight: 700, color: '#0f172a', textAlign: 'left' }}>{item.name}</td>
-                    <td style={{ textAlign: 'left', color: '#475569' }}>{item.email}</td>
-                    <td style={{ textAlign: 'center', color: '#475569' }}>{item.phone}</td>
+                    <td className="sno-cell" style={{ textAlign: 'center' }}>{item.sNo}</td>
+                    <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>{item.date}</td>
+                    <td style={{ fontWeight: '700', color: '#0f172a', textAlign: 'center' }}>{item.name}</td>
+                    <td style={{ textAlign: 'center' }}>{item.phone}</td>
+                    <td style={{ textAlign: 'center', color: '#004dad' }}>{item.email}</td>
+                    <td className="desc-cell" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
+                      {item.message}
+                    </td>
                     <td className="action-cell" style={{ textAlign: 'center' }}>
                       <div className="action-btns-group" style={{ justifyContent: 'center' }}>
                         <button 
+                          className="action-btn-circle view" 
+                          onClick={() => setViewingEnquiry(item)}
+                          title="View Details"
+                        >
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                        <button 
                           className="action-btn-circle delete" 
-                          onClick={() => { if (window.confirm('Delete this enquiry?')) { setEnquiries(enquiries.filter(e => e.id !== item.id)); } }}
+                          onClick={() => handleDelete(item.id)}
                           title="Delete Enquiry"
                         >
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
@@ -158,7 +283,179 @@ const AdminEnquiries = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Table Footer Pagination */}
+        <div className="table-footer-pagination-row">
+          <div className="pagination-info-text">
+            Showing {startIndex} to {endIndex} of {totalEntries} entries
+          </div>
+
+          <div className="pagination-controls-box">
+            <button 
+              className="page-nav-btn"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            >
+              Prev
+            </button>
+
+            {getPageNumbers().map((page, idx) => (
+              page === '...' ? (
+                <span key={`dots-${idx}`} className="page-nav-btn dots">...</span>
+              ) : (
+                <button
+                   key={page}
+                   className={`page-nav-btn ${currentPage === page ? 'active' : ''}`}
+                   onClick={() => setCurrentPage(page)}
+                >
+                   {page}
+                </button>
+              )
+            ))}
+
+            <button 
+              className="page-nav-btn"
+              disabled={currentPage === totalPages || totalPages === 0}
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+
       </div>
+
+      {/* =========================================================================
+          VIEW ENQUIRY DETAILS MODAL
+         ========================================================================= */}
+      {viewingEnquiry && (
+        <div className="admin-modal-overlay">
+          <div className="admin-modal" style={{ maxWidth: '580px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #e2e8f0' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                Customer Enquiry Details
+              </h3>
+              <button 
+                onClick={() => setViewingEnquiry(null)}
+                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#64748b' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Date</label>
+                  <div style={{ fontWeight: 700, color: '#0f172a' }}>{viewingEnquiry.date}</div>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Customer Name</label>
+                  <div style={{ fontWeight: 700, color: '#0f172a' }}>{viewingEnquiry.name}</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Phone Number</label>
+                  <div style={{ color: '#334155', fontWeight: 600 }}>{viewingEnquiry.phone}</div>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Email Address</label>
+                  <div style={{ color: '#004dad', fontWeight: 600 }}>{viewingEnquiry.email}</div>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', color: '#64748b', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Description / Full Message</label>
+                <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#334155', lineHeight: '1.6', wordBreak: 'break-word' }}>
+                  {viewingEnquiry.message}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '20px', textAlign: 'right' }}>
+              <button 
+                className="btn-dark-navy-back" 
+                onClick={() => setViewingEnquiry(null)}
+                style={{ padding: '8px 22px', borderRadius: '6px', cursor: 'pointer' }}
+              >
+                Close
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM DELETE CONFIRMATION POPUP MODAL */}
+      {deletingId && (
+        <div className="admin-modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="admin-modal" style={{ maxWidth: '420px', padding: '28px 24px', textAlign: 'center', borderRadius: '16px' }}>
+            
+            <div style={{ 
+              width: '60px', 
+              height: '60px', 
+              borderRadius: '50%', 
+              background: '#fef2f2', 
+              color: '#ef4444', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              margin: '0 auto 16px auto',
+              border: '1px solid #fee2e2',
+              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
+            }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M3 6h18" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
+              </svg>
+            </div>
+
+            <h3 style={{ fontSize: '19px', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
+              Confirm Delete
+            </h3>
+
+            <p style={{ fontSize: '14px', color: '#64748b', lineHeight: '1.5', marginBottom: '24px' }}>
+              Are you sure you want to delete this customer enquiry? This action cannot be undone.
+            </p>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button 
+                type="button" 
+                className="btn-cancel-outline" 
+                onClick={() => setDeletingId(null)}
+                style={{ flex: 1, padding: '10px 16px', borderRadius: '8px', fontWeight: 600 }}
+              >
+                Cancel
+              </button>
+
+              <button 
+                type="button" 
+                onClick={handleConfirmDelete}
+                style={{ 
+                  flex: 1, 
+                  padding: '10px 16px', 
+                  background: '#dc2626', 
+                  color: '#ffffff', 
+                  border: 'none', 
+                  borderRadius: '8px', 
+                  fontWeight: 700, 
+                  fontSize: '14px', 
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.25)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Delete
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Floating Scroll-to-Top Button */}
       <button 
