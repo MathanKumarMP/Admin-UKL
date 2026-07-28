@@ -29,23 +29,41 @@ const AdminBanners = () => {
   };
 
   const [formData, setFormData] = useState(defaultFormData);
+  const [formErrors, setFormErrors] = useState({});
+  const [toast, setToast] = useState(null);
 
-  // Fetch Banners from API
-  const fetchBanners = async () => {
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 3500);
+  };
+
+  const [totalEntries, setTotalEntries] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Fetch Banners from API with pagination & search
+  const fetchBanners = async (page = currentPage, limit = entriesPerPage, search = searchTerm) => {
     setLoading(true);
     setErrorMsg('');
     try {
       const token = localStorage.getItem('adminToken');
-      const response = await fetch(`${API_BASE}/api/admin/banners`, {
+      const queryParams = new URLSearchParams({
+        page: page,
+        limit: limit,
+        search: search
+      });
+      const response = await fetch(`${API_BASE}/api/admin/banners?${queryParams.toString()}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       const data = await response.json();
       if (data.success) {
+        const startNo = ((data.page || page) - 1) * limit;
         const mapped = data.banners.map((item, index) => ({
           id: item._id,
-          sNo: index + 1,
+          sNo: startNo + index + 1,
           title: item.title || '',
           pageName: item.pageName || 'Home Page',
           status: item.status || 'Active',
@@ -56,6 +74,8 @@ const AdminBanners = () => {
           order: item.order || 0
         }));
         setBanners(mapped);
+        setTotalEntries(data.total !== undefined ? data.total : mapped.length);
+        setTotalPages(data.totalPages !== undefined ? data.totalPages : (Math.ceil((data.total || mapped.length) / limit) || 1));
       } else {
         setErrorMsg(data.message || 'Failed to load banners.');
       }
@@ -68,38 +88,35 @@ const AdminBanners = () => {
   };
 
   useEffect(() => {
-    fetchBanners();
-  }, []);
+    fetchBanners(currentPage, entriesPerPage, searchTerm);
+  }, [currentPage, entriesPerPage, searchTerm]);
 
   // Handle File Input Change
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        showToast(`Image file "${file.name}" exceeds 5 MB limit. Please select an image under 5 MB.`, 'error');
+        setFormErrors(prev => ({ ...prev, image: 'Image size must be less than 5 MB' }));
+        e.target.value = '';
+        return;
+      }
       setSelectedFile(file);
       setFormData({
         ...formData,
         fileName: file.name,
         img: URL.createObjectURL(file) // local preview URL
       });
+      if (formErrors.image) {
+        setFormErrors(prev => ({ ...prev, image: '' }));
+      }
     }
   };
 
-  // Filter & Search
-  const filteredBanners = banners.filter(item => {
-    const term = searchTerm.toLowerCase();
-    return (
-      (item.title && item.title.toLowerCase().includes(term)) ||
-      (item.description && item.description.toLowerCase().includes(term)) ||
-      (item.pageName && item.pageName.toLowerCase().includes(term))
-    );
-  });
-
-  // Pagination Calculations
-  const totalEntries = filteredBanners.length;
-  const totalPages = Math.ceil(totalEntries / entriesPerPage) || 1;
+  // Server-Side Pagination Calculations
   const startIndex = totalEntries > 0 ? (currentPage - 1) * entriesPerPage + 1 : 0;
   const endIndex = Math.min(currentPage * entriesPerPage, totalEntries);
-  const currentSlice = filteredBanners.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage);
+  const currentSlice = banners;
 
   const getPageNumbers = () => {
     const pages = [];
@@ -125,7 +142,8 @@ const AdminBanners = () => {
     setDeletingBannerId(id);
   };
 
-  const handleConfirmDelete = async () => {
+  const confirmDelete = async () => {
+    if (!deletingBannerId) return;
     try {
       const token = localStorage.getItem('adminToken');
       const response = await fetch(`${API_BASE}/api/admin/banners/${deletingBannerId}`, {
@@ -136,14 +154,17 @@ const AdminBanners = () => {
       });
       const data = await response.json();
       if (data.success) {
+        setBanners(prev => prev.filter(b => b.id !== deletingBannerId));
         setDeletingBannerId(null);
         fetchBanners();
+        showToast(data.message || 'Banner deleted successfully', 'success');
       } else {
-        alert(data.message || 'Failed to delete banner');
+        showToast(data.message || 'Failed to delete banner.', 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Network error deleting banner.');
+      setDeletingBannerId(null);
+      showToast('Internet Error. Please check your network connection.', 'error');
     }
   };
 
@@ -151,12 +172,16 @@ const AdminBanners = () => {
     setFormData(defaultFormData);
     setSelectedFile(null);
     setEditingBanner(null);
+    setFormErrors({});
+    setErrorMsg('');
     setCurrentView('form');
   };
 
   const handleEdit = (item) => {
     setEditingBanner(item);
     setSelectedFile(null);
+    setFormErrors({});
+    setErrorMsg('');
     setFormData({
       title: item.title,
       pageName: item.pageName,
@@ -171,6 +196,22 @@ const AdminBanners = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Custom React State Validation
+    const errors = {};
+    if (!formData.title || !formData.title.trim()) {
+      errors.title = 'Banner title is required';
+    }
+    if (!selectedFile && !editingBanner && !formData.img) {
+      errors.image = 'Banner image is required';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    setFormErrors({});
     setLoading(true);
     setErrorMsg('');
 
@@ -210,17 +251,20 @@ const AdminBanners = () => {
       const data = await response.json();
 
       if (data.success) {
+        const successMsg = data.message || (editingBanner ? 'Banner updated successfully' : 'Banner created successfully');
         setCurrentView('list');
         setEditingBanner(null);
         setFormData(defaultFormData);
         setSelectedFile(null);
         fetchBanners();
+        showToast(successMsg, 'success');
       } else {
         setErrorMsg(data.message || 'Failed to save banner');
+        showToast(data.message || 'Failed to save banner', 'error');
       }
     } catch (err) {
       console.error(err);
-      setErrorMsg('Server connection error during save.');
+      showToast('Internet Error. Please check your network connection.', 'error');
     } finally {
       setLoading(false);
     }
@@ -229,6 +273,23 @@ const AdminBanners = () => {
   return (
     <div className="banners-module">
       
+      {/* Floating Toast Notification Popup */}
+      {toast && (
+        <div className="toast-notification-container">
+          <div className={`toast-popup-card ${toast.type}`}>
+            <div className="toast-popup-icon-box">
+              {toast.type === 'success' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              )}
+            </div>
+            <span className="toast-popup-text">{toast.message}</span>
+            <button className="toast-popup-close-btn" onClick={() => setToast(null)}>✕</button>
+          </div>
+        </div>
+      )}
+
       {/* Header Bar */}
       <div className="banner-list-header-bar">
         <h2 className="banner-header-title">Banner List</h2>
@@ -362,36 +423,38 @@ const AdminBanners = () => {
               Showing {startIndex} to {endIndex} of {totalEntries} entries
             </div>
 
-            <div className="pagination-controls-box">
-              <button 
-                className="page-nav-btn"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              >
-                Prev
-              </button>
+            <div className="pagination-right-wrapper">
+              <div className="pagination-controls-box">
+                <button 
+                  className="page-nav-btn"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                >
+                  Prev
+                </button>
 
-              {getPageNumbers().map((page, idx) => (
-                page === '...' ? (
-                  <span key={`dots-${idx}`} className="page-nav-btn dots">...</span>
-                ) : (
-                  <button
-                     key={page}
-                     className={`page-nav-btn ${currentPage === page ? 'active' : ''}`}
-                     onClick={() => setCurrentPage(page)}
-                  >
-                     {page}
-                  </button>
-                )
-              ))}
+                {getPageNumbers().map((page, idx) => (
+                  page === '...' ? (
+                    <span key={`dots-${idx}`} className="page-nav-btn dots">...</span>
+                  ) : (
+                    <button
+                       key={page}
+                       className={`page-nav-btn ${currentPage === page ? 'active' : ''}`}
+                       onClick={() => setCurrentPage(page)}
+                    >
+                       {page}
+                    </button>
+                  )
+                ))}
 
-              <button 
-                className="page-nav-btn"
-                disabled={currentPage === totalPages || totalPages === 0}
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              >
-                Next
-              </button>
+                <button 
+                  className="page-nav-btn"
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
 
@@ -410,54 +473,34 @@ const AdminBanners = () => {
             </h3>
           </div>
 
-          <form onSubmit={handleSubmit} className="modal-form blog-post-full-form">
+          <form noValidate onSubmit={handleSubmit} className="modal-form blog-post-full-form">
             
-            {/* Row 1: Banner Title * & Page Name * */}
+            {/* Row 1: Banner Title * & Status * */}
             <div className="form-row-2col">
               <div className="form-group">
-                <label>Banner Title <span className="req-star">*</span></label>
+                <div className="label-with-error-row">
+                  <label>Banner Title <span className="req-star">*</span></label>
+                  {formErrors.title && <span className="field-error-text">{formErrors.title}</span>}
+                </div>
                 <input
                   type="text"
                   placeholder="Enter title"
                   value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  required
+                  onChange={(e) => {
+                    setFormData({ ...formData, title: e.target.value });
+                    if (formErrors.title) {
+                      setFormErrors(prev => ({ ...prev, title: '' }));
+                    }
+                  }}
+                  className={formErrors.title ? 'input-field-error' : ''}
                 />
               </div>
 
               <div className="form-group">
-                <label>Page Name <span className="req-star">*</span></label>
-                <select
-                  value={formData.pageName}
-                  onChange={(e) => setFormData({ ...formData, pageName: e.target.value })}
-                  required
-                >
-                  <option value="Home Page">Home Page</option>
-                  <option value="Products Page">Products Page</option>
-                  <option value="About Page">About Page</option>
-                  <option value="Contact Page">Contact Page</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Row 2: Link (Optional) & Status * */}
-            <div className="form-row-2col">
-              <div className="form-group">
-                <label>Link (Optional)</label>
-                <input
-                  type="text"
-                  placeholder="Enter link URL"
-                  value={formData.linkUrl}
-                  onChange={(e) => setFormData({ ...formData, linkUrl: e.target.value })}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Status <span className="req-star">*</span></label>
+                <label style={{ marginBottom: '6px', display: 'block' }}>Status <span className="req-star">*</span></label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  required
                 >
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
@@ -465,21 +508,13 @@ const AdminBanners = () => {
               </div>
             </div>
 
-            {/* Row 3: Description */}
+            {/* Row 2: Banner Image */}
             <div className="form-group">
-              <label>Description</label>
-              <textarea
-                rows="4"
-                placeholder="Enter description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              />
-            </div>
-
-            {/* Row 4: Banner Image */}
-            <div className="form-group">
-              <label>Banner Image <span className="req-star">*</span></label>
-              <div className="custom-file-upload-box">
+              <div className="label-with-error-row">
+                <label>Banner Image <span className="req-star">*</span></label>
+                {formErrors.image && <span className="field-error-text">{formErrors.image}</span>}
+              </div>
+              <div className={`custom-file-upload-box ${formErrors.image ? 'input-field-error' : ''}`}>
                 <input
                   type="file"
                   id="bannerMediaFileInput"
@@ -497,9 +532,20 @@ const AdminBanners = () => {
               </div>
             </div>
 
+            
+
             {/* Form Action Buttons */}
             <div className="modal-actions banner-form-actions-right">
-              <button type="button" className="btn-cancel-outline" onClick={() => setCurrentView('list')} disabled={loading}>
+              <button 
+                type="button" 
+                className="btn-cancel-outline" 
+                onClick={() => {
+                  setFormErrors({});
+                  setErrorMsg('');
+                  setCurrentView('list');
+                }} 
+                disabled={loading}
+              >
                 Cancel
               </button>
               <button type="submit" className="btn-save-banner-filled" disabled={loading}>
@@ -627,7 +673,7 @@ const AdminBanners = () => {
 
               <button 
                 type="button" 
-                onClick={handleConfirmDelete}
+                onClick={confirmDelete}
                 style={{ 
                   flex: 1, 
                   padding: '10px 16px', 

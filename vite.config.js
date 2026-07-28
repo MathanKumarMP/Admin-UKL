@@ -6,6 +6,6 @@ export default defineConfig({
   assetsInclude: ['**/*.JPG', '**/*.jpg', '**/*.png', '**/*.PNG', '**/*.jpeg', '**/*.JPEG'],
   server: {
     port: 3000,
-    open: true
+    host: true
   }
 });

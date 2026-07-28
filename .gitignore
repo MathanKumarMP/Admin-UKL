@@ -11,6 +11,7 @@ lerna-debug.log*
 .antigravity
 .gemini
 .agents
+.env
 
 # Node dependencies & Build outputs
 node_modules

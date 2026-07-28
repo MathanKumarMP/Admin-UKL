@@ -25,9 +25,10 @@ const AdminGallery = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalEntries, setTotalEntries] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const [replaceMedia, setReplaceMedia] = useState(false);
 
   // Default Form State with Multi-Image & Multi-Video Support
   const defaultFormData = {
@@ -40,20 +41,35 @@ const AdminGallery = () => {
   };
 
   const [formData, setFormData] = useState(defaultFormData);
+  const [formErrors, setFormErrors] = useState({});
+  const [toast, setToast] = useState(null);
 
-  // Fetch Gallery Items from backend
-  const fetchGallery = async () => {
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 3500);
+  };
+
+  // Fetch Gallery Items from backend with pagination & search
+  const fetchGallery = async (page = currentPage, limit = entriesPerPage, search = searchTerm) => {
     setLoading(true);
     setErrorMsg('');
     try {
       const token = localStorage.getItem('adminToken');
-      const response = await fetch(`${API_BASE}/api/admin/gallery`, {
+      const queryParams = new URLSearchParams({
+        page: page,
+        limit: limit,
+        search: search
+      });
+      const response = await fetch(`${API_BASE}/api/admin/gallery?${queryParams.toString()}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       const data = await response.json();
       if (data.success) {
+        const startNo = ((data.page || page) - 1) * limit;
         const mapped = data.items.map((item, index) => {
           // Map type to capitalise 'Image' or 'Video'
           const mediaType = item.type === 'video' ? 'Video' : 'Image';
@@ -61,7 +77,7 @@ const AdminGallery = () => {
           const mediaList = item.mediaUrls.map(url => url.startsWith('http') ? url : `${API_BASE}${url}`);
           return {
             id: item._id,
-            sNo: index + 1,
+            sNo: startNo + index + 1,
             title: item.title || 'Untitled',
             mediaType,
             category: item.category || 'General',
@@ -72,6 +88,8 @@ const AdminGallery = () => {
           };
         });
         setGalleryItems(mapped);
+        setTotalEntries(data.total !== undefined ? data.total : mapped.length);
+        setTotalPages(data.totalPages !== undefined ? data.totalPages : (Math.ceil((data.total || mapped.length) / limit) || 1));
       } else {
         setErrorMsg(data.message || 'Failed to load gallery items.');
       }
@@ -84,13 +102,21 @@ const AdminGallery = () => {
   };
 
   useEffect(() => {
-    fetchGallery();
-  }, []);
+    fetchGallery(currentPage, entriesPerPage, searchTerm);
+  }, [currentPage, entriesPerPage, searchTerm]);
 
   // Handle File Input Change (Supports Multiple File Selection)
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
+      const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+      const oversizedImage = files.find(file => file.type.startsWith('image/') && file.size > MAX_IMAGE_SIZE);
+      if (oversizedImage) {
+        showToast(`Image "${oversizedImage.name}" exceeds 5 MB limit. Please select an image under 5 MB.`, 'error');
+        e.target.value = '';
+        return;
+      }
+
       const containsVideo = files.some(file => file.type.startsWith('video/'));
       const activeMediaType = containsVideo || formData.mediaType === 'Video' ? 'Video' : 'Image';
       
@@ -139,19 +165,10 @@ const AdminGallery = () => {
     });
   };
 
-  // Filter items by search term
-  const filteredItems = galleryItems.filter(item =>
-    (item.title && item.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (item.mediaType && item.mediaType.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (item.category && item.category.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
-  // Pagination Calculations
-  const totalEntries = filteredItems.length;
-  const totalPages = Math.ceil(totalEntries / entriesPerPage) || 1;
+  // Server-Side Pagination Calculations
   const startIndex = totalEntries > 0 ? (currentPage - 1) * entriesPerPage + 1 : 0;
   const endIndex = Math.min(currentPage * entriesPerPage, totalEntries);
-  const currentSlice = filteredItems.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage);
+  const currentSlice = galleryItems;
 
   const getPageNumbers = () => {
     const pages = [];
@@ -190,27 +207,31 @@ const AdminGallery = () => {
       if (data.success) {
         setDeletingItemId(null);
         fetchGallery();
+        showToast(data.message || 'Gallery item deleted successfully', 'success');
       } else {
-        alert(data.message || 'Failed to delete gallery item');
+        showToast(data.message || 'Failed to delete gallery item', 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Network error deleting gallery item.');
+      setDeletingItemId(null);
+      showToast('Internet Error. Please check your network connection.', 'error');
     }
   };
 
   const handleOpenAddForm = () => {
     setFormData(defaultFormData);
     setSelectedFiles([]);
-    setReplaceMedia(false);
     setEditingItem(null);
+    setFormErrors({});
+    setErrorMsg('');
     setCurrentView('form');
   };
 
   const handleEdit = (item) => {
     setEditingItem(item);
     setSelectedFiles([]);
-    setReplaceMedia(false);
+    setFormErrors({});
+    setErrorMsg('');
     setFormData({
       title: item.title,
       mediaType: item.mediaType,
@@ -225,6 +246,22 @@ const AdminGallery = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Client-side validation
+    const errors = {};
+    if (!formData.title || !formData.title.trim()) {
+      errors.title = 'Gallery title is required';
+    }
+    if (!editingItem && selectedFiles.length === 0 && (!formData.mediaList || formData.mediaList.length === 0)) {
+      errors.files = 'At least one media file is required';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    setFormErrors({});
     setLoading(true);
     setErrorMsg('');
 
@@ -235,7 +272,6 @@ const AdminGallery = () => {
       bodyFormData.append('type', formData.mediaType.toLowerCase()); // backend expects 'image' or 'video'
       bodyFormData.append('category', formData.category || 'General');
       bodyFormData.append('status', formData.status);
-      bodyFormData.append('replaceMedia', replaceMedia ? 'true' : 'false');
 
       selectedFiles.forEach((file) => {
         bodyFormData.append('mediaFiles', file);
@@ -264,17 +300,20 @@ const AdminGallery = () => {
       const data = await response.json();
 
       if (data.success) {
+        const successMsg = data.message || (editingItem ? 'Gallery item updated successfully' : 'Gallery item uploaded successfully');
         setCurrentView('list');
         setEditingItem(null);
         setFormData(defaultFormData);
         setSelectedFiles([]);
         fetchGallery();
+        showToast(successMsg, 'success');
       } else {
         setErrorMsg(data.message || 'Failed to save gallery item');
+        showToast(data.message || 'Failed to save gallery item', 'error');
       }
     } catch (err) {
       console.error(err);
-      setErrorMsg('Server connection error during save.');
+      showToast('Internet Error. Please check your network connection.', 'error');
     } finally {
       setLoading(false);
     }
@@ -283,11 +322,27 @@ const AdminGallery = () => {
   return (
     <div className="gallery-module">
       
+      {/* Floating Toast Notification Popup */}
+      {toast && (
+        <div className="toast-notification-container">
+          <div className={`toast-popup-card ${toast.type}`}>
+            <div className="toast-popup-icon-box">
+              {toast.type === 'success' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              )}
+            </div>
+            <span className="toast-popup-text">{toast.message}</span>
+            <button className="toast-popup-close-btn" onClick={() => setToast(null)}>✕</button>
+          </div>
+        </div>
+      )}
+
       {/* Header Bar matching UKL Theme */}
       <div className="banner-list-header-bar">
         <div>
           <h2 className="banner-header-title">Gallery Management</h2>
-          <span className="header-subtitle-info">Manage factory and product images & videos with multiple file upload support.</span>
         </div>
 
         {currentView === 'list' ? (
@@ -374,12 +429,41 @@ const AdminGallery = () => {
                         <td className="thumbnail-cell" style={{ textAlign: 'center' }}>
                           <div className="gallery-thumbnail-wrapper-relative" style={{ display: 'inline-block', position: 'relative' }}>
                             {isVideo ? (
-                              <div className="video-thumb-preview-placeholder">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#004dad' }}>
-                                  <polygon points="23 7 16 12 23 17 23 7" />
-                                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                                </svg>
-                              </div>
+                              item.mediaUrl ? (
+                                <div className="video-thumbnail-preview-container" style={{ position: 'relative', display: 'inline-block', borderRadius: '8px', overflow: 'hidden' }}>
+                                  <video
+                                    src={item.mediaUrl}
+                                    className="table-thumb-img gallery-preview"
+                                    style={{ width: '60px', height: '44px', objectFit: 'cover', display: 'block', borderRadius: '8px', background: '#0f172a' }}
+                                    muted
+                                    preload="metadata"
+                                  />
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '50%',
+                                    left: '50%',
+                                    transform: 'translate(-50%, -50%)',
+                                    background: 'rgba(0, 0, 0, 0.65)',
+                                    color: '#ffffff',
+                                    borderRadius: '50%',
+                                    width: '22px',
+                                    height: '22px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '10px',
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                                    pointerEvents: 'none'
+                                  }}>▶</div>
+                                </div>
+                              ) : (
+                                <div className="video-thumb-preview-placeholder">
+                                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#004dad' }}>
+                                    <polygon points="23 7 16 12 23 17 23 7" />
+                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                                  </svg>
+                                </div>
+                              )
                             ) : (
                               item.mediaUrl && <img src={item.mediaUrl} alt={item.title} className="table-thumb-img gallery-preview" />
                             )}
@@ -439,36 +523,38 @@ const AdminGallery = () => {
               Showing {startIndex} to {endIndex} of {totalEntries} entries
             </div>
 
-            <div className="pagination-controls-box">
-              <button 
-                className="page-nav-btn"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              >
-                Prev
-              </button>
+            <div className="pagination-right-wrapper">
+              <div className="pagination-controls-box">
+                <button 
+                  className="page-nav-btn"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                >
+                  Prev
+                </button>
 
-              {getPageNumbers().map((page, idx) => (
-                page === '...' ? (
-                  <span key={`dots-${idx}`} className="page-nav-btn dots">...</span>
-                ) : (
-                  <button
-                     key={page}
-                     className={`page-nav-btn ${currentPage === page ? 'active' : ''}`}
-                     onClick={() => setCurrentPage(page)}
-                  >
-                     {page}
-                  </button>
-                )
-              ))}
+                {getPageNumbers().map((page, idx) => (
+                  page === '...' ? (
+                    <span key={`dots-${idx}`} className="page-nav-btn dots">...</span>
+                  ) : (
+                    <button
+                       key={page}
+                       className={`page-nav-btn ${currentPage === page ? 'active' : ''}`}
+                       onClick={() => setCurrentPage(page)}
+                    >
+                       {page}
+                    </button>
+                  )
+                ))}
 
-              <button 
-                className="page-nav-btn"
-                disabled={currentPage === totalPages || totalPages === 0}
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              >
-                Next
-              </button>
+                <button 
+                  className="page-nav-btn"
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
 
@@ -486,27 +572,34 @@ const AdminGallery = () => {
             </h3>
           </div>
 
-          <form onSubmit={handleSubmit} className="modal-form blog-post-full-form">
+          <form noValidate onSubmit={handleSubmit} className="modal-form blog-post-full-form">
             
             {/* Row 1 (2 Columns): Title & Media Type */}
             <div className="form-row-2col">
               <div className="form-group">
-                <label>Gallery Title / Project Name <span className="req-star">*</span></label>
+                <div className="label-with-error-row">
+                  <label>Gallery Title / Project Name <span className="req-star">*</span></label>
+                  {formErrors.title && <span className="field-error-text">{formErrors.title}</span>}
+                </div>
                 <input 
                   type="text"
                   placeholder="Enter title"
                   value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  required
+                  onChange={(e) => {
+                    setFormData({ ...formData, title: e.target.value });
+                    if (formErrors.title) {
+                      setFormErrors(prev => ({ ...prev, title: '' }));
+                    }
+                  }}
+                  className={formErrors.title ? 'input-field-error' : ''}
                 />
               </div>
 
               <div className="form-group">
-                <label>Media Type <span className="req-star">*</span></label>
+                <label style={{ marginBottom: '6px', display: 'block' }}>Media Type <span className="req-star">*</span></label>
                 <select
                   value={formData.mediaType}
                   onChange={(e) => handleMediaTypeChange(e.target.value)}
-                  required
                 >
                   <option value="Image">Image (Photos)</option>
                   <option value="Video">Video (Clips)</option>
@@ -517,14 +610,22 @@ const AdminGallery = () => {
             {/* Row 2 (2 Columns): Select Files to Upload & Status */}
             <div className="form-row-2col">
               <div className="form-group">
-                <label>Select Images/Videos to Upload <span className="req-star">*</span></label>
-                <div className="custom-file-upload-box">
+                <div className="label-with-error-row">
+                  <label>Select Images/Videos to Upload <span className="req-star">*</span></label>
+                  {formErrors.files && <span className="field-error-text">{formErrors.files}</span>}
+                </div>
+                <div className={`custom-file-upload-box ${formErrors.files ? 'input-field-error' : ''}`}>
                   <input
                     type="file"
                     id="galleryFilesInput"
                     multiple
                     accept={formData.mediaType === 'Video' ? 'video/*' : 'image/*'}
-                    onChange={handleFileChange}
+                    onChange={(e) => {
+                      handleFileChange(e);
+                      if (formErrors.files) {
+                        setFormErrors(prev => ({ ...prev, files: '' }));
+                      }
+                    }}
                     className="hidden-file-input"
                   />
                   <label htmlFor="galleryFilesInput" className="btn-choose-file">
@@ -535,11 +636,10 @@ const AdminGallery = () => {
               </div>
 
               <div className="form-group">
-                <label>Status <span className="req-star">*</span></label>
+                <label style={{ marginBottom: '6px', display: 'block' }}>Status <span className="req-star">*</span></label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  required
                 >
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
@@ -547,30 +647,12 @@ const AdminGallery = () => {
               </div>
             </div>
 
-            {/* Row 3 (2 Columns): Category & Replace Toggle (Edit Mode) */}
-            <div className="form-row-2col">
-              
 
-              {editingItem ? (
-                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '24px' }}>
-                  <input 
-                    type="checkbox" 
-                    id="replaceMediaCheckbox" 
-                    checked={replaceMedia} 
-                    onChange={(e) => setReplaceMedia(e.target.checked)} 
-                    style={{ width: 'auto', cursor: 'pointer' }}
-                  />
-                  <label htmlFor="replaceMediaCheckbox" style={{ margin: 0, cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
-                    Replace existing files completely?
-                  </label>
-                </div>
-              ) : <div></div>}
-            </div>
 
             {/* Preview Selected Files */}
             {formData.mediaList && formData.mediaList.length > 0 && (
               <div className="form-group">
-                <label>Selected Media Files ({formData.mediaList.length})</label>
+                <label style={{ marginBottom: '6px', display: 'block' }}>Selected Media Files ({formData.mediaList.length})</label>
                 <div className="gallery-bulk-preview-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '12px', marginTop: '10px' }}>
                   {formData.mediaList.map((media, idx) => {
                     const isVid = formData.mediaType === 'Video';
@@ -616,7 +698,16 @@ const AdminGallery = () => {
 
             {/* Actions */}
             <div className="modal-actions banner-form-actions-right" style={{ marginTop: '24px' }}>
-              <button type="button" className="btn-cancel-outline" onClick={() => setCurrentView('list')} disabled={loading}>
+              <button 
+                type="button" 
+                className="btn-cancel-outline" 
+                onClick={() => {
+                  setFormErrors({});
+                  setErrorMsg('');
+                  setCurrentView('list');
+                }} 
+                disabled={loading}
+              >
                 Cancel
               </button>
               <button type="submit" className="btn-save-banner-filled" disabled={loading}>
@@ -718,16 +809,7 @@ const AdminGallery = () => {
                 <button type="button" className="btn-secondary-dark" onClick={() => setViewingItem(null)}>
                   Close
                 </button>
-                <button 
-                  type="button" 
-                  className="btn-save-banner-filled"
-                  onClick={() => {
-                    handleEdit(viewingItem);
-                    setViewingItem(null);
-                  }}
-                >
-                  Edit Media
-                </button>
+                {/*  */}
               </div>
 
             </div>

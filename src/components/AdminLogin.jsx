@@ -3,15 +3,77 @@ import logo from '../assets/favicon.png';
 import { API_BASE } from '../config';
 
 const AdminLogin = ({ onLoginSuccess }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [pin, setPin] = useState(['', '', '', '']);
+  const [showPin, setShowPin] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [toast, setToast] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
+
+  const showToast = (message, type = 'error') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 3500);
+  };
+
+  // Handle Phone Number Input (Only digits, max 10 characters)
+  const handlePhoneChange = (e) => {
+    const numericVal = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setPhone(numericVal);
+    if (formErrors.phone) {
+      setFormErrors(prev => ({ ...prev, phone: '' }));
+    }
+  };
+
+  // Handle PIN Digit Changes
+  const handlePinChange = (index, value) => {
+    if (!/^\d*$/.test(value)) return;
+    const newPin = [...pin];
+    newPin[index] = value.slice(-1);
+    setPin(newPin);
+
+    if (formErrors.pin) {
+      setFormErrors(prev => ({ ...prev, pin: '' }));
+    }
+
+    // Auto-focus next input box
+    if (value && index < 3) {
+      const nextInput = document.getElementById(`login-pin-${index + 1}`);
+      if (nextInput) nextInput.focus();
+    }
+  };
+
+  const handlePinKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !pin[index] && index > 0) {
+      const prevInput = document.getElementById(`login-pin-${index - 1}`);
+      if (prevInput) prevInput.focus();
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setErrorMessage('');
+    setFormErrors({});
+
+    const errors = {};
+    const pinStr = pin.join('');
+    
+    // Strict Field Validation
+    if (!phone || !phone.trim()) {
+      errors.phone = 'Please enter Phone Number';
+    } else if (phone.length !== 10) {
+      errors.phone = 'Must be 10 digits';
+    }
+
+    if (!pinStr || pinStr.length < 4) {
+      errors.pin = 'Enter 4-digit PIN';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -20,145 +82,178 @@ const AdminLogin = ({ onLoginSuccess }) => {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ phone, pin: pinStr })
       });
 
       const data = await response.json();
 
       if (data.success) {
-        // Save JWT Token & User Info in LocalStorage
+        const newSessionId = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 9);
         localStorage.setItem('adminToken', data.token);
         localStorage.setItem('adminUser', JSON.stringify(data.user));
-        
-        setIsLoading(false);
-        if (onLoginSuccess) {
-          onLoginSuccess(data.user);
+        localStorage.setItem('adminSessionId', newSessionId);
+
+        try {
+          const authChannel = new BroadcastChannel('ukl_admin_session');
+          authChannel.postMessage({ type: 'NEW_LOGIN', sessionId: newSessionId });
+          authChannel.close();
+        } catch (e) {
+          console.log(e);
         }
+
+        setIsLoading(false);
+        showToast(data.message, 'success');
+        setTimeout(() => {
+          if (onLoginSuccess) {
+            onLoginSuccess(data.user, newSessionId);
+          }
+        }, 1000);
       } else {
         setIsLoading(false);
-        setErrorMessage(data.message || 'Invalid email or password.');
+        showToast(data.message, 'error');
       }
     } catch (err) {
       console.error('[Login API Error]:', err);
       setIsLoading(false);
-      setErrorMessage('Cannot connect to the server. Ensure the backend is running.');
+      showToast('Internet Error. Please check your network connection.', 'error');
     }
   };
 
   return (
     <div className="admin-login-fullscreen">
-      
-      {/* Background Industrial Overlay */}
-      <div className="login-bg-overlay"></div>
+      {/* Floating Toast Notification Popup */}
+      {toast && (
+        <div className="toast-notification-container">
+          <div className={`toast-popup-card ${toast.type}`}>
+            <div className="toast-popup-icon-box">
+              {toast.type === 'success' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              )}
+            </div>
+            <span className="toast-popup-text">{toast.message}</span>
+            <button className="toast-popup-close-btn" onClick={() => setToast(null)}>✕</button>
+          </div>
+        </div>
+      )}
 
-      {/* Floating Card Container (Matching User Screenshot UI) */}
       <div className="login-card-box">
-        
-        {/* UKL Brand Badge & Header */}
+        {/* UKL Brand Logo */}
         <div className="login-header-section">
           <div className="login-logo-badge">
             <img src={logo} alt="UKL Instruments Logo" className="login-logo-img" />
           </div>
-          <h1 className="login-brand-title">UKL Instruments</h1>
           <h2 className="login-main-heading">Sign In</h2>
-          <p className="login-subtitle">Enter your credentials to access the dashboard</p>
+          <p className="login-subtitle">Enter Your Phone Number and PIN to Continue</p>
         </div>
 
-        {/* Error Alert Message */}
-        {errorMessage && (
-          <div className="login-error-alert">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <span>{errorMessage}</span>
-          </div>
-        )}
+        {/* Sign In Form with noValidate & autoComplete=off to block Chrome password autofill */}
+        <form noValidate autoComplete="off" onSubmit={handleLogin} className="login-form">
+          {/* Hidden dummy inputs to absorb Chrome password manager autofill */}
+          <input type="text" name="fake_username" style={{ display: 'none' }} tabIndex="-1" autoComplete="off" />
+          <input type="password" name="fake_password" style={{ display: 'none' }} tabIndex="-1" autoComplete="off" />
 
-        {/* Sign In Form */}
-        <form onSubmit={handleLogin} className="login-form">
-          
-          {/* Email / Username Field */}
+          {/* Phone Number Field (Strict 10 Digits Only) */}
           <div className="login-field-group">
-            <label htmlFor="loginEmail">Email Address or Username</label>
-            <div className="login-input-wrapper">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <label htmlFor="loginPhone" style={{ margin: 0 }}>Phone Number</label>
+              {formErrors.phone && (
+                <span style={{ color: '#ef4444', fontSize: '12.5px', fontWeight: '700' }}>
+                  {formErrors.phone}
+                </span>
+              )}
+            </div>
+            <div className={`login-input-wrapper ${formErrors.phone ? 'input-field-error' : ''}`}>
               <span className="input-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#004dad" strokeWidth="2">
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                  <polyline points="22,6 12,13 2,6" />
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                 </svg>
               </span>
               <input
-                id="loginEmail"
-                type="email"
-                placeholder="Enter email address..."
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+                id="loginPhone"
+                name="admin_phone_number"
+                type="text"
+                maxLength="10"
+                placeholder="Enter Phone Number"
+                value={phone}
+                onChange={handlePhoneChange}
+                autoComplete="new-password"
                 className="login-input-field"
+                style={{
+                  border: 'none',
+                  outline: 'none',
+                  background: 'transparent',
+                  padding: 0,
+                  margin: 0,
+                  boxShadow: 'none',
+                  width: '100%',
+                  height: '100%',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: '#0f172a'
+                }}
               />
             </div>
           </div>
 
-          {/* Password Field */}
+          {/* PIN Field (4 Individual Digit Boxes + Toggle Eye Icon) */}
           <div className="login-field-group">
-            <label htmlFor="loginPassword">Password / PIN</label>
-            <div className="login-input-wrapper">
-              <span className="input-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#004dad" strokeWidth="2">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-              </span>
-              <input
-                id="loginPassword"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="Enter password..."
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="login-input-field"
-              />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <label htmlFor="loginPin" style={{ margin: 0 }}>PIN</label>
+              {formErrors.pin && (
+                <span style={{ color: '#ef4444', fontSize: '12.5px', fontWeight: '700' }}>
+                  {formErrors.pin}
+                </span>
+              )}
+            </div>
+            <div className="login-pin-row-flex">
+              <div className="login-pin-boxes-container">
+                {[0, 1, 2, 3].map(idx => (
+                  <input
+                    key={idx}
+                    id={`login-pin-${idx}`}
+                    name={`admin_pin_box_${idx}`}
+                    type={showPin ? 'text' : 'password'}
+                    maxLength="1"
+                    autoComplete="new-password"
+                    className={`login-pin-digit-input ${formErrors.pin ? 'input-field-error' : ''}`}
+                    value={pin[idx] || ''}
+                    onChange={(e) => handlePinChange(idx, e.target.value)}
+                    onKeyDown={(e) => handlePinKeyDown(idx, e)}
+                  />
+                ))}
+              </div>
+
               <button
                 type="button"
-                className="toggle-password-btn"
-                onClick={() => setShowPassword(!showPassword)}
-                title={showPassword ? 'Hide Password' : 'Show Password'}
+                className="login-pin-toggle-btn"
+                onClick={() => setShowPin(!showPin)}
+                title={showPin ? 'Hide PIN' : 'Show PIN'}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                   <circle cx="12" cy="12" r="3" />
                 </svg>
               </button>
             </div>
-            
-            {/* Forgot Password Link */}
-            <div className="forgot-password-row">
-              <button type="button" className="forgot-password-btn" onClick={() => alert('Please contact system administrator to reset password.')}>
-                Forgot Password?
-              </button>
-            </div>
           </div>
 
           {/* Sign In Submit Button */}
-          <button type="submit" className="login-submit-btn" disabled={isLoading}>
+          <button type="submit" className="login-submit-btn navy-btn" disabled={isLoading}>
             {isLoading ? (
               <span className="login-spinner-text">Authenticating...</span>
             ) : (
               <span>Sign In</span>
             )}
           </button>
-
         </form>
 
-        {/* Footer Credit Matching Screenshot */}
+        {/* Footer Credit */}
         <div className="login-footer-credits">
           Powered by UKL Instruments
         </div>
-
       </div>
-
     </div>
   );
 };

@@ -1,15 +1,87 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import logo from '../assets/favicon.png';
 import AdminBanners from './AdminBanners';
 import AdminGallery from './AdminGallery';
 import AdminNews from './AdminNews';
 import AdminEnquiries from './AdminEnquiries';
+import AdminUsers from './AdminUsers';
+import AdminNotFound from './AdminNotFound';
 
 const AdminLayout = ({ onLogout }) => {
-  const [activeModule, setActiveModule] = useState('banners');
+  const getInitialModule = () => {
+    const path = window.location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+    const hash = window.location.hash.replace('#', '').toLowerCase();
+    const route = hash || path;
+
+    if (route === '' || route === 'banners') return 'banners';
+    if (route === 'gallery') return 'gallery';
+    if (route === 'news') return 'news';
+    if (route === 'enquiries' || route === 'enquiry') return 'enquiries';
+    if (route === 'users') return 'users';
+    return 'notFound';
+  };
+
+  const [activeModule, setActiveModule] = useState(getInitialModule);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const notificationRef = useRef(null);
+  const profileRef = useRef(null);
+
+  // Sync route on Browser Back / Forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      setActiveModule(getInitialModule());
+    };
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
+    };
+  }, []);
+
+  const handleModuleChange = (moduleId) => {
+    setActiveModule(moduleId);
+    const newPath = moduleId === 'banners' ? '/banners' : `/${moduleId}`;
+    if (window.location.pathname !== newPath) {
+      window.history.pushState(null, '', newPath);
+    }
+  };
+
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('adminUser');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  // Close profile & notification dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const userName = currentUser?.name || 'Admin';
+  const userEmail = currentUser?.email || currentUser?.phone || 'admin@uklinstruments.com';
+  const userAvatar = currentUser?.avatar || null;
+
+  // FIRST LETTER ONLY (e.g. "Mathan" -> "M", "UKL Admin" -> "U")
+  const firstLetter = userName.trim().charAt(0).toUpperCase() || 'A';
 
   const navItems = [
     {
@@ -53,6 +125,18 @@ const AdminLayout = ({ onLogout }) => {
           <polyline points="22,6 12,13 2,6" />
         </svg>
       )
+    },
+    {
+      id: 'users',
+      label: 'Admin Users',
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      )
     }
   ];
 
@@ -64,9 +148,13 @@ const AdminLayout = ({ onLogout }) => {
         return <AdminNews />;
       case 'enquiries':
         return <AdminEnquiries />;
+      case 'users':
+        return <AdminUsers />;
       case 'banners':
-      default:
         return <AdminBanners />;
+      case 'notFound':
+      default:
+        return <AdminNotFound onNavigate={handleModuleChange} />;
     }
   };
 
@@ -92,7 +180,7 @@ const AdminLayout = ({ onLogout }) => {
                 <button
                   key={item.id}
                   className={`nav-tab-btn ${isActive ? 'active' : ''}`}
-                  onClick={() => setActiveModule(item.id)}
+                  onClick={() => handleModuleChange(item.id)}
                 >
                   <span className="tab-icon">{item.icon}</span>
                   <span className="tab-label">{item.label}</span>
@@ -119,7 +207,7 @@ const AdminLayout = ({ onLogout }) => {
             </div> */}
 
             {/* Notification Bell Icon */}
-            <div className="notification-wrapper">
+            <div className="notification-wrapper" ref={notificationRef}>
               <button 
                 className="icon-btn-badge"
                 onClick={() => setShowNotifications(!showNotifications)}
@@ -153,14 +241,29 @@ const AdminLayout = ({ onLogout }) => {
             </div>
 
             {/* User Profile Badge */}
-            <div className="profile-wrapper">
+            <div className="profile-wrapper" ref={profileRef}>
               <button 
                 className="profile-pill-btn"
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
               >
-                <div className="profile-avatar-circle">UK</div>
+                {userAvatar ? (
+                  <img
+                    src={userAvatar}
+                    alt={userName}
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      flexShrink: 0,
+                      border: '1.5px solid #004dad'
+                    }}
+                  />
+                ) : (
+                  <div className="profile-avatar-circle">{firstLetter}</div>
+                )}
                 <div className="profile-text-group">
-                  <span className="profile-name">UKL Admin</span>
+                  <span className="profile-name">{userName}</span>
                   <span className="profile-role">Manager</span>
                 </div>
                 <svg className="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -171,8 +274,8 @@ const AdminLayout = ({ onLogout }) => {
               {showProfileMenu && (
                 <div className="dropdown-panel profile-menu-panel">
                   <div className="profile-menu-header">
-                    <p className="user-full-name">UKL Admin Panel</p>
-                    <p className="user-email">admin@uklinstruments.com</p>
+                    <p className="user-full-name">{userName}</p>
+                    <p className="user-email">{userEmail}</p>
                   </div>
                   <button className="menu-item-btn danger" onClick={onLogout}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>

@@ -21,8 +21,8 @@ const AdminNews = () => {
   const [sortDirection, setSortDirection] = useState('asc');
 
   // Categories & Tags Lists
-  const [categories, setCategories] = useState(['Company News', 'Technical Guide', 'Certifications', 'Events & Exhibitions']);
-  const [tags, setTags] = useState(['Latest Articles', 'FRP Vessels', 'RO Plant', 'Desalination', 'ASME', 'Water Treatment', 'Membrane Housing']);
+  const [categories, setCategories] = useState([]);
+  const [tags, setTags] = useState([]);
   
   // Tag / Category Management State
   const [tagSearchTerm, setTagSearchTerm] = useState('');
@@ -33,50 +33,70 @@ const AdminNews = () => {
   const [categoryInput, setCategoryInput] = useState('');
   const [editingTagIndex, setEditingTagIndex] = useState(null);
   const [editingCategoryIndex, setEditingCategoryIndex] = useState(null);
+  const [deletingTagIdx, setDeletingTagIdx] = useState(null);
+  const [deletingCatIdx, setDeletingCatIdx] = useState(null);
 
   // Store raw uploaded file
   const [selectedFile, setSelectedFile] = useState(null);
 
-  // Default Form State with all 14 requested fields
+  // Default Form State with all requested fields (empty defaults)
   const defaultFormData = {
-    category: 'Company News',
+    category: '',
     title: '',
     slug: '',
-    thumbnail: newsImg1,
+    thumbnail: '',
     thumbnailFileName: 'No file chosen',
     metaTitle: '',
     metaDescription: '',
-    metaKeyword: 'FRP Vessels, RO Plant, Water Treatment',
+    metaKeyword: '',
     blogDate: new Date().toISOString().split('T')[0],
     shortDescription: '',
     blogDetails: '',
     addMostRead: false,
-    tagList: ['FRP Vessels'],
-    latestArticles: true,
-    author: 'UKL Media Team',
+    tagList: [],
+    latestArticles: false,
+    author: '',
     status: 'Active',
   };
 
   const [formData, setFormData] = useState(defaultFormData);
+  const [formErrors, setFormErrors] = useState({});
+  const [toast, setToast] = useState(null);
 
-  // Fetch articles from backend API
-  const fetchArticles = async () => {
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 3500);
+  };
+
+  const [totalEntries, setTotalEntries] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Fetch articles from backend API with pagination & search
+  const fetchArticles = async (page = currentPage, limit = entriesPerPage, search = searchTerm) => {
     setLoading(true);
     setErrorMsg('');
     try {
       const token = localStorage.getItem('adminToken');
-      const response = await fetch(`${API_BASE}/api/admin/news?limit=1000`, {
+      const queryParams = new URLSearchParams({
+        page: page,
+        limit: limit,
+        search: search
+      });
+      const response = await fetch(`${API_BASE}/api/admin/news?${queryParams.toString()}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       const data = await response.json();
-      if (data.success) {
+      if (data.success && Array.isArray(data.articles)) {
+        const startNo = ((data.page || page) - 1) * limit;
         const mapped = data.articles.map((item, index) => ({
-          id: item._id,
-          sNo: index + 1,
-          title: item.title,
-          slug: item.slug,
+          id: item._id || String(index + 1),
+          sNo: startNo + index + 1,
+          title: item.title || '',
+          slug: item.slug || '',
           thumbnail: item.thumbnail ? (item.thumbnail.startsWith('http') ? item.thumbnail : `${API_BASE}${item.thumbnail}`) : newsImg1,
           metaTitle: item.metaTitle || '',
           metaDescription: item.metaDescription || '',
@@ -92,20 +112,64 @@ const AdminNews = () => {
           status: item.status || 'Active'
         }));
         setArticles(mapped);
+        setTotalEntries(data.total !== undefined ? data.total : mapped.length);
+        setTotalPages(data.totalPages !== undefined ? data.totalPages : (Math.ceil((data.total || mapped.length) / limit) || 1));
       } else {
-        setErrorMsg(data.message || 'Failed to fetch news articles.');
+        setArticles([]);
+        setTotalEntries(0);
+        setTotalPages(1);
       }
     } catch (err) {
       console.error(err);
-      setErrorMsg('Failed to connect to backend server.');
+      setArticles([]);
     } finally {
       setLoading(false);
     }
   };
 
+  // Fetch Tags from Backend API with search support (?search=)
+  const fetchTags = async (search = tagSearchTerm) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_BASE}/api/admin/tags?search=${encodeURIComponent(search)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success && Array.isArray(data.tags)) {
+        setTags(data.tags);
+      }
+    } catch (err) {
+      console.log('Error fetching tags from API, using fallback');
+    }
+  };
+
+  // Fetch Categories from Backend API with search support (?search=)
+  const fetchCategories = async (search = categorySearchTerm) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_BASE}/api/admin/categories?search=${encodeURIComponent(search)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success && Array.isArray(data.categories)) {
+        setCategories(data.categories);
+      }
+    } catch (err) {
+      console.log('Error fetching categories from API, using fallback');
+    }
+  };
+
   useEffect(() => {
-    fetchArticles();
-  }, []);
+    fetchArticles(currentPage, entriesPerPage, searchTerm);
+  }, [currentPage, entriesPerPage, searchTerm]);
+
+  useEffect(() => {
+    fetchTags(tagSearchTerm);
+  }, [tagSearchTerm]);
+
+  useEffect(() => {
+    fetchCategories(categorySearchTerm);
+  }, [categorySearchTerm]);
 
   // Auto-generate slug when title changes
   const handleTitleChange = (e) => {
@@ -121,12 +185,24 @@ const AdminNews = () => {
       slug: generatedSlug,
       metaTitle: titleVal.length > 0 ? `${titleVal} | UKL Instruments` : ''
     });
+    if (formErrors.title) {
+      setFormErrors(prev => ({ ...prev, title: '' }));
+    }
+    if (formErrors.slug) {
+      setFormErrors(prev => ({ ...prev, slug: '' }));
+    }
   };
 
   // Thumbnail file change handler
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        showToast(`Image file "${file.name}" exceeds 5 MB limit. Please select an image under 5 MB.`, 'error');
+        setFormErrors(prev => ({ ...prev, thumbnail: 'Image size must be less than 5 MB' }));
+        e.target.value = '';
+        return;
+      }
       setSelectedFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -135,6 +211,9 @@ const AdminNews = () => {
           thumbnail: reader.result,
           thumbnailFileName: file.name
         });
+        if (formErrors.thumbnail) {
+          setFormErrors(prev => ({ ...prev, thumbnail: '' }));
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -160,33 +239,10 @@ const AdminNews = () => {
     }
   };
 
-  // Filter & Search
-  const filteredArticles = articles.filter(item => {
-    const term = searchTerm.toLowerCase();
-    return (
-      (item.title && item.title.toLowerCase().includes(term)) ||
-      (item.slug && item.slug.toLowerCase().includes(term)) ||
-      (item.metaTitle && item.metaTitle.toLowerCase().includes(term)) ||
-      (item.metaDescription && item.metaDescription.toLowerCase().includes(term)) ||
-      (item.author && item.author.toLowerCase().includes(term))
-    );
-  }).sort((a, b) => {
-    let valA = a[sortField] || '';
-    let valB = b[sortField] || '';
-    if (typeof valA === 'string') valA = valA.toLowerCase();
-    if (typeof valB === 'string') valB = valB.toLowerCase();
-
-    if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-    if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  // Pagination Calculations
-  const totalEntries = filteredArticles.length;
-  const totalPages = Math.ceil(totalEntries / entriesPerPage) || 1;
+  // Server-Side Pagination Calculations
   const startIndex = totalEntries > 0 ? (currentPage - 1) * entriesPerPage + 1 : 0;
   const endIndex = Math.min(currentPage * entriesPerPage, totalEntries);
-  const currentSlice = filteredArticles.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage);
+  const currentSlice = articles;
 
   const handleEntriesChange = (e) => {
     setEntriesPerPage(Number(e.target.value));
@@ -226,8 +282,8 @@ const AdminNews = () => {
   };
 
   useEffect(() => {
-    if (currentView === 'form' && editorRef.current) {
-      if (editorRef.current.innerHTML !== formData.blogDetails) {
+    if (currentView === 'form') {
+      if (editorRef.current) {
         editorRef.current.innerHTML = formData.blogDetails || '';
       }
     }
@@ -243,6 +299,28 @@ const AdminNews = () => {
   // Save new or updated article
   const handleSubmitArticle = async (e) => {
     e.preventDefault();
+
+    const errors = {};
+    if (!formData.title || !formData.title.trim()) {
+      errors.title = 'Title is required';
+    }
+    if (!formData.slug || !formData.slug.trim()) {
+      errors.slug = 'Slug is required';
+    }
+    if (!formData.shortDescription || !formData.shortDescription.trim()) {
+      errors.shortDescription = 'Short description is required';
+    }
+    if (!formData.blogDetails || !formData.blogDetails.trim()) {
+      errors.blogDetails = 'Details description is required';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      showToast('Please fill out all required fields marked with *', 'error');
+      return;
+    }
+
+    setFormErrors({});
     setLoading(true);
     setErrorMsg('');
 
@@ -285,17 +363,20 @@ const AdminNews = () => {
 
       const data = await response.json();
       if (data.success) {
+        const successMsg = data.message || (editingArticle ? 'News article updated successfully' : 'News article created successfully');
         setCurrentView('list');
         setEditingArticle(null);
         setSelectedFile(null);
         setFormData(defaultFormData);
         fetchArticles();
+        showToast(successMsg, 'success');
       } else {
         setErrorMsg(data.message || 'Failed to save news article.');
+        showToast(data.message || 'Failed to save news article.', 'error');
       }
     } catch (err) {
       console.error(err);
-      setErrorMsg('Failed to connect to backend server during save.');
+      showToast('Internet Error. Please check your network connection.', 'error');
     } finally {
       setLoading(false);
     }
@@ -305,25 +386,27 @@ const AdminNews = () => {
     setFormData(defaultFormData);
     setSelectedFile(null);
     setEditingArticle(null);
+    setFormErrors({});
+    setErrorMsg('');
     setCurrentView('form');
   };
 
-  const handleEdit = (article) => {
+  const handleEditArticle = (article) => {
     setEditingArticle(article);
     setSelectedFile(null);
+    setFormErrors({});
+    setErrorMsg('');
     setFormData({
       ...defaultFormData,
       ...article,
-      thumbnailFileName: 'Current Stored Thumbnail'
+      thumbnailFileName: article.thumbnail ? article.thumbnail.split('/').pop() : 'No file chosen'
     });
     setCurrentView('form');
   };
 
   const [deletingArticleId, setDeletingArticleId] = useState(null);
-  const [deletingTagIdx, setDeletingTagIdx] = useState(null);
-  const [deletingCatIdx, setDeletingCatIdx] = useState(null);
 
-  const handleDelete = (id) => {
+  const handleDeleteArticle = (id) => {
     setDeletingArticleId(id);
   };
 
@@ -340,36 +423,68 @@ const AdminNews = () => {
       if (data.success) {
         setDeletingArticleId(null);
         fetchArticles();
+        showToast(data.message || 'News article deleted successfully', 'success');
       } else {
-        alert(data.message || 'Failed to delete news article.');
+        showToast(data.message || 'Failed to delete news article.', 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Error connecting to server for deletion.');
+      setDeletingArticleId(null);
+      showToast('Internet Error. Please check your network connection.', 'error');
     }
   };
 
-  // TAG MANAGEMENT HANDLERS (Local State)
-  const handleSaveTag = (e) => {
+  // TAG MANAGEMENT HANDLERS (Backend API + Local Fallback)
+  const handleSaveTag = async (e) => {
     e.preventDefault();
     if (!tagInput.trim()) return;
-    if (editingTagIndex !== null) {
-      const updated = [...tags];
-      updated[editingTagIndex] = tagInput.trim();
-      setTags(updated);
-      setEditingTagIndex(null);
-    } else {
-      if (!tags.includes(tagInput.trim())) {
-        setTags([...tags, tagInput.trim()]);
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      let url = `${API_BASE}/api/admin/tags`;
+      let method = 'POST';
+
+      if (editingTagIndex !== null && tags[editingTagIndex]?._id) {
+        url = `${API_BASE}/api/admin/tags/${tags[editingTagIndex]._id}`;
+        method = 'PUT';
       }
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ name: tagInput.trim() })
+      });
+      const data = await response.json();
+      if (data.success) {
+        showToast(data.message || 'Tag saved successfully', 'success');
+        fetchTags(tagSearchTerm);
+      } else {
+        showToast(data.message || 'Failed to save tag', 'error');
+      }
+    } catch (err) {
+      const tagName = tagInput.trim();
+      if (editingTagIndex !== null) {
+        const updated = [...tags];
+        updated[editingTagIndex] = typeof updated[editingTagIndex] === 'object' ? { ...updated[editingTagIndex], name: tagName } : tagName;
+        setTags(updated);
+      } else {
+        setTags(prev => [...prev, { name: tagName }]);
+      }
+      showToast('Tag saved locally', 'success');
     }
+
     setTagInput('');
+    setEditingTagIndex(null);
     setShowTagForm(false);
   };
 
   const handleEditTag = (index) => {
     setEditingTagIndex(index);
-    setTagInput(tags[index]);
+    const item = tags[index];
+    setTagInput(typeof item === 'object' ? item.name : item);
     setShowTagForm(true);
   };
 
@@ -377,27 +492,77 @@ const AdminNews = () => {
     setDeletingTagIdx(index);
   };
 
-  // CATEGORY MANAGEMENT HANDLERS (Local State)
-  const handleSaveCategory = (e) => {
+  const confirmDeleteTag = async () => {
+    if (deletingTagIdx === null) return;
+    const tagObj = tags[deletingTagIdx];
+    try {
+      const token = localStorage.getItem('adminToken');
+      if (tagObj && tagObj._id) {
+        await fetch(`${API_BASE}/api/admin/tags/${tagObj._id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+      showToast('Tag deleted successfully', 'success');
+      fetchTags(tagSearchTerm);
+    } catch (err) {
+      setTags(prev => prev.filter((_, idx) => idx !== deletingTagIdx));
+      showToast('Tag deleted successfully', 'success');
+    }
+    setDeletingTagIdx(null);
+  };
+
+  // CATEGORY MANAGEMENT HANDLERS (Backend API + Local Fallback)
+  const handleSaveCategory = async (e) => {
     e.preventDefault();
     if (!categoryInput.trim()) return;
-    if (editingCategoryIndex !== null) {
-      const updated = [...categories];
-      updated[editingCategoryIndex] = categoryInput.trim();
-      setCategories(updated);
-      setEditingCategoryIndex(null);
-    } else {
-      if (!categories.includes(categoryInput.trim())) {
-        setCategories([...categories, categoryInput.trim()]);
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      let url = `${API_BASE}/api/admin/categories`;
+      let method = 'POST';
+
+      if (editingCategoryIndex !== null && categories[editingCategoryIndex]?._id) {
+        url = `${API_BASE}/api/admin/categories/${categories[editingCategoryIndex]._id}`;
+        method = 'PUT';
       }
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ name: categoryInput.trim() })
+      });
+      const data = await response.json();
+      if (data.success) {
+        showToast(data.message || 'Category saved successfully', 'success');
+        fetchCategories(categorySearchTerm);
+      } else {
+        showToast(data.message || 'Failed to save category', 'error');
+      }
+    } catch (err) {
+      const catName = categoryInput.trim();
+      if (editingCategoryIndex !== null) {
+        const updated = [...categories];
+        updated[editingCategoryIndex] = typeof updated[editingCategoryIndex] === 'object' ? { ...updated[editingCategoryIndex], name: catName } : catName;
+        setCategories(updated);
+      } else {
+        setCategories(prev => [...prev, { name: catName }]);
+      }
+      showToast('Category saved locally', 'success');
     }
+
     setCategoryInput('');
+    setEditingCategoryIndex(null);
     setShowCategoryForm(false);
   };
 
   const handleEditCategory = (index) => {
     setEditingCategoryIndex(index);
-    setCategoryInput(categories[index]);
+    const item = categories[index];
+    setCategoryInput(typeof item === 'object' ? item.name : item);
     setShowCategoryForm(true);
   };
 
@@ -405,13 +570,57 @@ const AdminNews = () => {
     setDeletingCatIdx(index);
   };
 
+  const confirmDeleteCategory = async () => {
+    if (deletingCatIdx === null) return;
+    const catObj = categories[deletingCatIdx];
+    try {
+      const token = localStorage.getItem('adminToken');
+      if (catObj && catObj._id) {
+        await fetch(`${API_BASE}/api/admin/categories/${catObj._id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+      showToast('Category deleted successfully', 'success');
+      fetchCategories(categorySearchTerm);
+    } catch (err) {
+      setCategories(prev => prev.filter((_, idx) => idx !== deletingCatIdx));
+      showToast('Category deleted successfully', 'success');
+    }
+    setDeletingCatIdx(null);
+  };
+
   // Filtered Tags & Categories for Search
-  const filteredTagsList = tags.filter(t => t.toLowerCase().includes(tagSearchTerm.toLowerCase()));
-  const filteredCategoriesList = categories.filter(c => c.toLowerCase().includes(categorySearchTerm.toLowerCase()));
+  const filteredTagsList = Array.isArray(tags) ? tags.filter(t => {
+    const name = typeof t === 'object' ? t.name : t;
+    return (name || '').toLowerCase().includes((tagSearchTerm || '').toLowerCase());
+  }) : [];
+
+  const filteredCategoriesList = Array.isArray(categories) ? categories.filter(c => {
+    const name = typeof c === 'object' ? c.name : c;
+    return (name || '').toLowerCase().includes((categorySearchTerm || '').toLowerCase());
+  }) : [];
 
   return (
     <div className="blog-post-module">
       
+      {/* Floating Toast Notification Popup */}
+      {toast && (
+        <div className="toast-notification-container">
+          <div className={`toast-popup-card ${toast.type}`}>
+            <div className="toast-popup-icon-box">
+              {toast.type === 'success' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              )}
+            </div>
+            <span className="toast-popup-text">{toast.message}</span>
+            <button className="toast-popup-close-btn" onClick={() => setToast(null)}>✕</button>
+          </div>
+        </div>
+      )}
+
       {/* Header Bar matching View Mode */}
       {currentView === 'list' && (
         <div className="blog-post-header-bar">
@@ -420,12 +629,12 @@ const AdminNews = () => {
           </div>
 
           <div className="header-action-buttons">
-            <button className="btn-coral-tag" onClick={() => { setCurrentView('tags'); setShowTagForm(false); }}>
+            {/* <button className="btn-coral-tag" onClick={() => { setCurrentView('tags'); setShowTagForm(false); }}>
               Add Tags
             </button>
             <button className="btn-peach-category" onClick={() => { setCurrentView('categories'); setShowCategoryForm(false); }}>
               Add Category
-            </button>
+            </button> */}
 
             <button className="btn-vibrant-add" onClick={handleOpenAddForm}>
               <span className="plus-icon">+</span> Add
@@ -476,25 +685,25 @@ const AdminNews = () => {
               <thead>
                 <tr>
                   <th onClick={() => handleSort('sNo')} className="sortable-th" style={{ width: '70px', textAlign: 'center' }}>
-                    S.No <span className="sort-arrows">↑↓</span>
+                    S.No
                   </th>
                   <th onClick={() => handleSort('title')} className="sortable-th" style={{ textAlign: 'left' }}>
-                    Title <span className="sort-arrows">↑↓</span>
+                    Title
                   </th>
                   <th onClick={() => handleSort('slug')} className="sortable-th" style={{ textAlign: 'left' }}>
-                    Slug <span className="sort-arrows">↑↓</span>
+                    Slug
                   </th>
                   <th onClick={() => handleSort('thumbnail')} className="sortable-th" style={{ width: '100px', textAlign: 'center' }}>
-                    Thumbnail <span className="sort-arrows">↑↓</span>
+                    Thumbnail
                   </th>
                   <th onClick={() => handleSort('metaTitle')} className="sortable-th" style={{ textAlign: 'left' }}>
-                    Meta Title <span className="sort-arrows">↑↓</span>
+                    Meta Title
                   </th>
                   <th onClick={() => handleSort('metaDescription')} className="sortable-th" style={{ textAlign: 'left' }}>
-                    Meta Description <span className="sort-arrows">↑↓</span>
+                    Meta Description
                   </th>
                   <th className="action-th" style={{ width: '130px', textAlign: 'center' }}>
-                    Action <span className="sort-arrows">↑↓</span>
+                    Action
                   </th>
                 </tr>
               </thead>
@@ -533,14 +742,14 @@ const AdminNews = () => {
                           </button>
                           <button 
                             className="action-btn-circle edit" 
-                            onClick={() => handleEdit(item)}
+                            onClick={() => handleEditArticle(item)}
                             title="Edit Post"
                           >
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                           </button>
                           <button 
                             className="action-btn-circle delete" 
-                            onClick={() => handleDelete(item.id)}
+                            onClick={() => handleDeleteArticle(item.id)}
                             title="Delete Post"
                           >
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
@@ -560,36 +769,38 @@ const AdminNews = () => {
               Showing {startIndex} to {endIndex} of {totalEntries} entries
             </div>
 
-            <div className="pagination-controls-box">
-              <button 
-                className="page-nav-btn"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              >
-                Prev
-              </button>
+            <div className="pagination-right-wrapper">
+              <div className="pagination-controls-box">
+                <button 
+                  className="page-nav-btn"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                >
+                  Prev
+                </button>
 
-              {getPageNumbers().map((page, idx) => (
-                page === '...' ? (
-                  <span key={`dots-${idx}`} className="page-nav-btn dots">...</span>
-                ) : (
-                  <button
-                     key={page}
-                     className={`page-nav-btn ${currentPage === page ? 'active' : ''}`}
-                     onClick={() => setCurrentPage(page)}
-                  >
-                     {page}
-                  </button>
-                )
-              ))}
+                {getPageNumbers().map((page, idx) => (
+                  page === '...' ? (
+                    <span key={`dots-${idx}`} className="page-nav-btn dots">...</span>
+                  ) : (
+                    <button
+                       key={page}
+                       className={`page-nav-btn ${currentPage === page ? 'active' : ''}`}
+                       onClick={() => setCurrentPage(page)}
+                    >
+                       {page}
+                    </button>
+                  )
+                ))}
 
-              <button 
-                className="page-nav-btn"
-                disabled={currentPage === totalPages || totalPages === 0}
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              >
-                Next
-              </button>
+                <button 
+                  className="page-nav-btn"
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
 
@@ -610,38 +821,50 @@ const AdminNews = () => {
             </button>
           </div>
 
-          <form onSubmit={handleSubmitArticle} className="modal-form blog-post-full-form">
+          <form noValidate onSubmit={handleSubmitArticle} className="modal-form blog-post-full-form">
             <div className="form-fields-main-layout">
               {/* Left Column: Form Fields */}
               <div className="form-main-fields-col">
                 
                 {/* Title */}
                 <div className="form-group">
-                  <label>Title <span className="req-star">*</span></label>
+                  <div className="label-with-error-row">
+                    <label>Title <span className="req-star">*</span></label>
+                    {formErrors.title && <span className="field-error-text">{formErrors.title}</span>}
+                  </div>
                   <input 
                     type="text"
                     placeholder="Enter blog post title"
                     value={formData.title}
                     onChange={handleTitleChange}
-                    required
+                    className={formErrors.title ? 'input-field-error' : ''}
                   />
                 </div>
 
                 {/* Slug */}
                 <div className="form-group">
-                  <label>Slug <span className="req-star">*</span></label>
+                  <div className="label-with-error-row">
+                    <label>Slug <span className="req-star">*</span></label>
+                    {formErrors.slug && <span className="field-error-text">{formErrors.slug}</span>}
+                  </div>
                   <input 
                     type="text"
                     placeholder="auto-generated-slug-path"
                     value={formData.slug}
-                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                    required
+                    onChange={(e) => {
+                      setFormData({ ...formData, slug: e.target.value });
+                      if (formErrors.slug) setFormErrors(prev => ({ ...prev, slug: '' }));
+                    }}
+                    className={formErrors.slug ? 'input-field-error' : ''}
                   />
                 </div>
 
                 {/* Word Processor Toolbar for blog details */}
                 <div className="form-group">
-                  <label>Description / Details <span className="req-star">*</span></label>
+                  <div className="label-with-error-row">
+                    <label>Description / Details <span className="req-star">*</span></label>
+                    {formErrors.blogDetails && <span className="field-error-text">{formErrors.blogDetails}</span>}
+                  </div>
                   <div className="text-editor-rich-toolbar">
                     <button type="button" onClick={() => handleExecCommand('bold')} title="Bold"><b>B</b></button>
                     <button type="button" onClick={() => handleExecCommand('italic')} title="Italic"><i>I</i></button>
@@ -660,10 +883,13 @@ const AdminNews = () => {
                   {/* Rich Text Editor Container */}
                   <div 
                     ref={editorRef}
-                    className="content-editable-rich-editor"
+                    className={`content-editable-rich-editor ${formErrors.blogDetails ? 'input-field-error' : ''}`}
                     contentEditable
                     placeholder="Write article details here..."
-                    onInput={(e) => setFormData({ ...formData, blogDetails: e.currentTarget.innerHTML })}
+                    onInput={(e) => {
+                      setFormData({ ...formData, blogDetails: e.currentTarget.innerHTML });
+                      if (formErrors.blogDetails) setFormErrors(prev => ({ ...prev, blogDetails: '' }));
+                    }}
                     style={{ minHeight: '220px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '12px', background: '#fff', outline: 'none' }}
                   ></div>
                   
@@ -677,7 +903,7 @@ const AdminNews = () => {
                   <legend>SEO Settings</legend>
                   
                   <div className="form-group">
-                    <label>Meta Title</label>
+                    <label style={{ marginBottom: '6px', display: 'block' }}>Meta Title</label>
                     <input 
                       type="text"
                       placeholder="SEO optimized browser title"
@@ -687,7 +913,7 @@ const AdminNews = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Meta Keywords</label>
+                    <label style={{ marginBottom: '6px', display: 'block' }}>Meta Keywords</label>
                     <input 
                       type="text"
                       placeholder="Comma-separated keywords"
@@ -697,7 +923,7 @@ const AdminNews = () => {
                   </div>
 
                   <div className="form-group">
-                    <label>Meta Description</label>
+                    <label style={{ marginBottom: '6px', display: 'block' }}>Meta Description</label>
                     <textarea 
                       placeholder="Brief search engine description (150-160 characters)"
                       rows="3"
@@ -714,8 +940,11 @@ const AdminNews = () => {
                 
                 {/* Thumbnail upload box */}
                 <div className="form-group">
-                  <label>Thumbnail Image <span className="req-star">*</span></label>
-                  <div className="thumbnail-upload-dropzone">
+                  <div className="label-with-error-row">
+                    <label>Thumbnail Image <span className="req-star">*</span></label>
+                    {formErrors.thumbnail && <span className="field-error-text">{formErrors.thumbnail}</span>}
+                  </div>
+                  <div className={`thumbnail-upload-dropzone ${formErrors.thumbnail ? 'input-field-error' : ''}`}>
                     <div className="dropzone-media-preview-container">
                       <img src={formData.thumbnail} alt="Upload preview" className="dropzone-preview-img" />
                     </div>
@@ -737,13 +966,19 @@ const AdminNews = () => {
 
                 {/* Short Description */}
                 <div className="form-group">
-                  <label>Short Summary / Hook <span className="req-star">*</span></label>
+                  <div className="label-with-error-row">
+                    <label>Short Summary / Hook <span className="req-star">*</span></label>
+                    {formErrors.shortDescription && <span className="field-error-text">{formErrors.shortDescription}</span>}
+                  </div>
                   <textarea 
                     placeholder="Short description displayed on card"
                     rows="3"
                     value={formData.shortDescription}
-                    onChange={(e) => setFormData({ ...formData, shortDescription: e.target.value })}
-                    required
+                    onChange={(e) => {
+                      setFormData({ ...formData, shortDescription: e.target.value });
+                      if (formErrors.shortDescription) setFormErrors(prev => ({ ...prev, shortDescription: '' }));
+                    }}
+                    className={formErrors.shortDescription ? 'input-field-error' : ''}
                   ></textarea>
                 </div>
 
@@ -773,9 +1008,13 @@ const AdminNews = () => {
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   >
-                    {categories.map((cat, idx) => (
-                      <option key={idx} value={cat}>{cat}</option>
-                    ))}
+                    <option value="">Select Category</option>
+                    {categories.map((cat, idx) => {
+                      const catName = typeof cat === 'object' ? cat.name : cat;
+                      return (
+                        <option key={idx} value={catName}>{catName}</option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -784,15 +1023,16 @@ const AdminNews = () => {
                   <label>Tags Selection</label>
                   <div className="tags-checkbox-multi-grid">
                     {tags.map((tag, idx) => {
-                      const isChecked = formData.tagList ? formData.tagList.includes(tag) : false;
+                      const tagName = typeof tag === 'object' ? tag.name : tag;
+                      const isChecked = formData.tagList ? formData.tagList.includes(tagName) : false;
                       return (
                         <label key={idx} className="checkbox-pill-label">
                           <input 
                             type="checkbox"
                             checked={isChecked}
-                            onChange={() => handleTagToggle(tag)}
+                            onChange={() => handleTagToggle(tagName)}
                           />
-                          <span>{tag}</span>
+                          <span>{tagName}</span>
                         </label>
                       );
                     })}
@@ -919,17 +1159,18 @@ const AdminNews = () => {
                 ) : (
                   filteredTagsList.map((tag, index) => {
                     const originalIdx = tags.indexOf(tag);
+                    const tagName = typeof tag === 'object' ? tag.name : tag;
                     return (
-                      <tr key={index}>
+                      <tr key={tag._id || index}>
                         <td style={{ textAlign: 'center' }}>{index + 1}</td>
-                        <td style={{ textAlign: 'left', fontWeight: 'bold', color: '#0f172a' }}>{tag}</td>
+                        <td style={{ textAlign: 'left', fontWeight: 'bold', color: '#0f172a' }}>{tagName}</td>
                         <td className="action-cell" style={{ textAlign: 'center' }}>
                           <div className="action-btns-group" style={{ justifyContent: 'center' }}>
                             <button className="action-btn-circle edit" onClick={() => handleEditTag(originalIdx)} title="Edit Tag">
                               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                             </button>
                             <button className="action-btn-circle delete" onClick={() => handleDeleteTag(originalIdx)} title="Delete Tag">
-                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2 2v2" /></svg>
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
                             </button>
                           </div>
                         </td>
@@ -1012,10 +1253,11 @@ const AdminNews = () => {
                 ) : (
                   filteredCategoriesList.map((cat, index) => {
                     const originalIdx = categories.indexOf(cat);
+                    const catName = typeof cat === 'object' ? cat.name : cat;
                     return (
-                      <tr key={index}>
+                      <tr key={cat._id || index}>
                         <td style={{ textAlign: 'center' }}>{index + 1}</td>
-                        <td style={{ textAlign: 'left', fontWeight: 'bold', color: '#0f172a' }}>{cat}</td>
+                        <td style={{ textAlign: 'left', fontWeight: 'bold', color: '#0f172a' }}>{catName}</td>
                         <td className="action-cell" style={{ textAlign: 'center' }}>
                           <div className="action-btns-group" style={{ justifyContent: 'center' }}>
                             <button className="action-btn-circle edit" onClick={() => handleEditCategory(originalIdx)} title="Edit Category">
@@ -1191,10 +1433,12 @@ const AdminNews = () => {
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
             </div>
             <h3 style={{ fontSize: '19px', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>Delete Tag</h3>
-            <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>Are you sure you want to delete tag "{tags[deletingTagIdx]}"?</p>
+            <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>
+              Are you sure you want to delete tag "{typeof tags[deletingTagIdx] === 'object' ? tags[deletingTagIdx]?.name : tags[deletingTagIdx]}"?
+            </p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
               <button type="button" className="btn-cancel-outline" onClick={() => setDeletingTagIdx(null)} style={{ flex: 1, padding: '10px 16px' }}>Cancel</button>
-              <button type="button" onClick={() => { setTags(tags.filter((_, idx) => idx !== deletingTagIdx)); setDeletingTagIdx(null); }} style={{ flex: 1, padding: '10px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700 }}>Delete</button>
+              <button type="button" onClick={confirmDeleteTag} style={{ flex: 1, padding: '10px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700 }}>Delete</button>
             </div>
           </div>
         </div>
@@ -1208,10 +1452,12 @@ const AdminNews = () => {
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
             </div>
             <h3 style={{ fontSize: '19px', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>Delete Category</h3>
-            <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>Are you sure you want to delete category "{categories[deletingCatIdx]}"?</p>
+            <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px' }}>
+              Are you sure you want to delete category "{typeof categories[deletingCatIdx] === 'object' ? categories[deletingCatIdx]?.name : categories[deletingCatIdx]}"?
+            </p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
               <button type="button" className="btn-cancel-outline" onClick={() => setDeletingCatIdx(null)} style={{ flex: 1, padding: '10px 16px' }}>Cancel</button>
-              <button type="button" onClick={() => { setCategories(categories.filter((_, idx) => idx !== deletingCatIdx)); setDeletingCatIdx(null); }} style={{ flex: 1, padding: '10px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700 }}>Delete</button>
+              <button type="button" onClick={confirmDeleteCategory} style={{ flex: 1, padding: '10px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 700 }}>Delete</button>
             </div>
           </div>
         </div>

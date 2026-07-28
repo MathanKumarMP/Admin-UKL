@@ -12,23 +12,40 @@ const AdminEnquiries = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Fetch Enquiries from API
-  const fetchEnquiries = async () => {
+  const [totalEntries, setTotalEntries] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 3500);
+  };
+
+  // Fetch Enquiries from API with pagination & search
+  const fetchEnquiries = async (page = currentPage, limit = entriesPerPage, search = searchTerm) => {
     setLoading(true);
     setErrorMsg('');
     try {
       const token = localStorage.getItem('adminToken');
-      // Fetch all entries from backend admin route
-      const response = await fetch(`${API_BASE}/api/admin/enquiries?limit=1000`, {
+      const queryParams = new URLSearchParams({
+        page: page,
+        limit: limit,
+        search: search
+      });
+      const response = await fetch(`${API_BASE}/api/admin/enquiries?${queryParams.toString()}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       const data = await response.json();
       if (data.success) {
+        const startNo = ((data.page || page) - 1) * limit;
         const mapped = data.enquiries.map((item, index) => ({
           id: item._id,
-          sNo: index + 1,
+          sNo: startNo + index + 1,
           name: item.name,
           email: item.email,
           phone: item.phone,
@@ -41,6 +58,8 @@ const AdminEnquiries = () => {
           status: item.status
         }));
         setEnquiries(mapped);
+        setTotalEntries(data.total !== undefined ? data.total : mapped.length);
+        setTotalPages(data.totalPages !== undefined ? data.totalPages : (Math.ceil((data.total || mapped.length) / limit) || 1));
       } else {
         setErrorMsg(data.message || 'Failed to fetch enquiries.');
       }
@@ -53,22 +72,13 @@ const AdminEnquiries = () => {
   };
 
   useEffect(() => {
-    fetchEnquiries();
-  }, []);
+    fetchEnquiries(currentPage, entriesPerPage, searchTerm);
+  }, [currentPage, entriesPerPage, searchTerm]);
 
-  const filteredEnquiries = enquiries.filter(item =>
-    (item.name && item.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (item.email && item.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (item.phone && item.phone.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (item.message && item.message.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
-  // Pagination Calculations
-  const totalEntries = filteredEnquiries.length;
-  const totalPages = Math.ceil(totalEntries / entriesPerPage) || 1;
+  // Server-Side Pagination Calculations
   const startIndex = totalEntries > 0 ? (currentPage - 1) * entriesPerPage + 1 : 0;
   const endIndex = Math.min(currentPage * entriesPerPage, totalEntries);
-  const currentSlice = filteredEnquiries.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage);
+  const currentSlice = enquiries;
 
   const getPageNumbers = () => {
     const pages = [];
@@ -106,9 +116,10 @@ const AdminEnquiries = () => {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      showToast('Enquiries exported to Excel successfully', 'success');
     } catch (err) {
       console.error(err);
-      alert('Failed to generate Excel export.');
+      showToast('Failed to generate Excel export.', 'error');
     }
   };
 
@@ -129,18 +140,37 @@ const AdminEnquiries = () => {
       if (data.success) {
         setDeletingId(null);
         fetchEnquiries();
+        showToast(data.message || 'Enquiry deleted successfully', 'success');
       } else {
-        alert(data.message || 'Failed to delete enquiry');
+        showToast(data.message || 'Failed to delete enquiry', 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Error deleting enquiry.');
+      setDeletingId(null);
+      showToast('Internet Error. Please check your network connection.', 'error');
     }
   };
 
   return (
     <div className="enquiries-module">
       
+      {/* Floating Toast Notification Popup */}
+      {toast && (
+        <div className="toast-notification-container">
+          <div className={`toast-popup-card ${toast.type}`}>
+            <div className="toast-popup-icon-box">
+              {toast.type === 'success' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              )}
+            </div>
+            <span className="toast-popup-text">{toast.message}</span>
+            <button className="toast-popup-close-btn" onClick={() => setToast(null)}>✕</button>
+          </div>
+        </div>
+      )}
+
       {/* Header Bar matching UKL Theme */}
       <div className="banner-list-header-bar">
         <div>
@@ -290,36 +320,38 @@ const AdminEnquiries = () => {
             Showing {startIndex} to {endIndex} of {totalEntries} entries
           </div>
 
-          <div className="pagination-controls-box">
-            <button 
-              className="page-nav-btn"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            >
-              Prev
-            </button>
+          <div className="pagination-right-wrapper">
+            <div className="pagination-controls-box">
+              <button 
+                className="page-nav-btn"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              >
+                Prev
+              </button>
 
-            {getPageNumbers().map((page, idx) => (
-              page === '...' ? (
-                <span key={`dots-${idx}`} className="page-nav-btn dots">...</span>
-              ) : (
-                <button
-                   key={page}
-                   className={`page-nav-btn ${currentPage === page ? 'active' : ''}`}
-                   onClick={() => setCurrentPage(page)}
-                >
-                   {page}
-                </button>
-              )
-            ))}
+              {getPageNumbers().map((page, idx) => (
+                page === '...' ? (
+                  <span key={`dots-${idx}`} className="page-nav-btn dots">...</span>
+                ) : (
+                  <button
+                     key={page}
+                     className={`page-nav-btn ${currentPage === page ? 'active' : ''}`}
+                     onClick={() => setCurrentPage(page)}
+                  >
+                     {page}
+                  </button>
+                )
+              ))}
 
-            <button 
-              className="page-nav-btn"
-              disabled={currentPage === totalPages || totalPages === 0}
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            >
-              Next
-            </button>
+              <button 
+                className="page-nav-btn"
+                disabled={currentPage === totalPages || totalPages === 0}
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
 
