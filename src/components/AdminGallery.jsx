@@ -227,21 +227,87 @@ const AdminGallery = () => {
     setCurrentView('form');
   };
 
-  const handleEdit = (item) => {
-    setEditingItem(item);
-    setSelectedFiles([]);
-    setFormErrors({});
-    setErrorMsg('');
-    setFormData({
-      title: item.title,
-      mediaType: item.mediaType,
-      status: item.status,
-      category: item.category || 'General',
-      mediaList: item.mediaList || [],
-      mediaUrl: item.mediaUrl || '',
-      fileName: `${item.mediaList.length} file(s) currently stored`
-    });
-    setCurrentView('form');
+  const handleEdit = async (item) => {
+    try {
+      const itemId = item._id || item.id;
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/gallery/${itemId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      const fresh = (data.success && data.item) ? data.item : item;
+
+      const mediaUrls = (fresh.mediaUrls || []).map(url =>
+        url.startsWith('http') || url.startsWith('data:') ? url : `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`
+      );
+
+      setEditingItem({
+        ...fresh,
+        id: fresh._id || fresh.id
+      });
+      setSelectedFiles([]);
+      setFormErrors({});
+      setErrorMsg('');
+      setFormData({
+        title: fresh.title || '',
+        mediaType: fresh.type || 'image',
+        status: fresh.status || 'Active',
+        category: fresh.category || 'General',
+        mediaList: mediaUrls,
+        mediaUrl: mediaUrls[0] || '',
+        fileName: `${mediaUrls.length} file(s) currently stored`
+      });
+      setCurrentView('form');
+    } catch (err) {
+      console.error('Error fetching single gallery item for edit:', err);
+      setEditingItem(item);
+      setSelectedFiles([]);
+      setFormErrors({});
+      setErrorMsg('');
+      setFormData({
+        title: item.title,
+        mediaType: item.mediaType,
+        status: item.status,
+        category: item.category || 'General',
+        mediaList: item.mediaList || [],
+        mediaUrl: item.mediaUrl || '',
+        fileName: `${item.mediaList ? item.mediaList.length : 0} file(s) currently stored`
+      });
+      setCurrentView('form');
+    }
+  };
+
+  const handleViewGalleryItem = async (item) => {
+    try {
+      const itemId = item._id || item.id;
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/gallery/${itemId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.item) {
+        const fresh = data.item;
+        const mediaUrls = (fresh.mediaUrls || []).map(url =>
+          url.startsWith('http') || url.startsWith('data:') ? url : `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`
+        );
+        const mappedItem = {
+          ...fresh,
+          id: fresh._id || fresh.id,
+          mediaType: fresh.type || 'image',
+          mediaList: mediaUrls,
+          mediaUrl: mediaUrls[0] || ''
+        };
+        setViewingItem(mappedItem);
+        setSelectedModalMedia(mappedItem.mediaUrl);
+      } else {
+        setViewingItem(item);
+        setSelectedModalMedia(item.mediaUrl);
+      }
+    } catch (err) {
+      console.error('Error fetching single gallery item for view:', err);
+      setViewingItem(item);
+      setSelectedModalMedia(item.mediaUrl);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -529,10 +595,7 @@ const AdminGallery = () => {
                           <div className="action-btns-group" style={{ justifyContent: 'center' }}>
                             <button 
                               className="action-btn-circle view" 
-                              onClick={() => {
-                                setViewingItem(item);
-                                setSelectedModalMedia(item.mediaUrl);
-                              }}
+                              onClick={() => handleViewGalleryItem(item)}
                               title="View Details"
                             >
                               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>

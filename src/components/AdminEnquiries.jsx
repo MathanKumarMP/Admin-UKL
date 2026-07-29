@@ -123,6 +123,30 @@ const AdminEnquiries = () => {
     }
   };
 
+  const handleViewEnquiry = async (item) => {
+    try {
+      const enquiryId = item._id || item.id;
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/enquiries/${enquiryId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.enquiry) {
+        const fresh = data.enquiry;
+        setViewingEnquiry({
+          ...fresh,
+          id: fresh._id || fresh.id,
+          date: fresh.createdAt ? new Date(fresh.createdAt).toLocaleString('en-IN') : item.date
+        });
+      } else {
+        setViewingEnquiry(item);
+      }
+    } catch (err) {
+      console.error('Error fetching single enquiry details for view:', err);
+      setViewingEnquiry(item);
+    }
+  };
+
   const handleDelete = (id) => {
     setDeletingId(id);
   };
@@ -292,7 +316,7 @@ const AdminEnquiries = () => {
                       <div className="action-btns-group" style={{ justifyContent: 'center' }}>
                         <button 
                           className="action-btn-circle view" 
-                          onClick={() => setViewingEnquiry(item)}
+                          onClick={() => handleViewEnquiry(item)}
                           title="View Details"
                         >
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>

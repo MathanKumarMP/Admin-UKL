@@ -327,7 +327,7 @@ const AdminNews = () => {
     try {
       const token = localStorage.getItem('adminToken');
       const bodyFormData = new FormData();
-      bodyFormData.append('category', formData.category);
+      bodyFormData.append('category', formData.category || 'General');
       bodyFormData.append('title', formData.title);
       bodyFormData.append('slug', formData.slug.toLowerCase());
       bodyFormData.append('metaTitle', formData.metaTitle);
@@ -391,17 +391,69 @@ const AdminNews = () => {
     setCurrentView('form');
   };
 
-  const handleEditArticle = (article) => {
-    setEditingArticle(article);
-    setSelectedFile(null);
-    setFormErrors({});
-    setErrorMsg('');
-    setFormData({
-      ...defaultFormData,
-      ...article,
-      thumbnailFileName: article.thumbnail ? article.thumbnail.split('/').pop() : 'No file chosen'
-    });
-    setCurrentView('form');
+  const handleEditArticle = async (article) => {
+    try {
+      const articleId = article._id || article.id;
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/news/${articleId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      const fresh = (data.success && data.article) ? data.article : article;
+
+      const thumbnailPath = fresh.thumbnail || '';
+      const mappedArticle = {
+        ...defaultFormData,
+        ...fresh,
+        id: fresh._id || fresh.id,
+        thumbnail: thumbnailPath ? (thumbnailPath.startsWith('http') || thumbnailPath.startsWith('data:') ? thumbnailPath : `${API_BASE}${thumbnailPath.startsWith('/') ? '' : '/'}${thumbnailPath}`) : '',
+        thumbnailFileName: thumbnailPath ? thumbnailPath.split('/').pop() : 'No file chosen'
+      };
+
+      setEditingArticle(mappedArticle);
+      setSelectedFile(null);
+      setFormErrors({});
+      setErrorMsg('');
+      setFormData(mappedArticle);
+      setCurrentView('form');
+    } catch (err) {
+      console.error('Error fetching single article details for edit:', err);
+      setEditingArticle(article);
+      setSelectedFile(null);
+      setFormErrors({});
+      setErrorMsg('');
+      setFormData({
+        ...defaultFormData,
+        ...article,
+        thumbnailFileName: article.thumbnail ? article.thumbnail.split('/').pop() : 'No file chosen'
+      });
+      setCurrentView('form');
+    }
+  };
+
+  const handleViewArticle = async (article) => {
+    try {
+      const articleId = article._id || article.id;
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/news/${articleId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.article) {
+        const fresh = data.article;
+        const thumbnailPath = fresh.thumbnail || '';
+        setViewingArticle({
+          ...fresh,
+          id: fresh._id || fresh.id,
+          thumbnail: thumbnailPath ? (thumbnailPath.startsWith('http') || thumbnailPath.startsWith('data:') ? thumbnailPath : `${API_BASE}${thumbnailPath.startsWith('/') ? '' : '/'}${thumbnailPath}`) : newsImg1
+        });
+      } else {
+        setViewingArticle(article);
+      }
+    } catch (err) {
+      console.error('Error fetching single article details for view:', err);
+      setViewingArticle(article);
+    }
   };
 
   const [deletingArticleId, setDeletingArticleId] = useState(null);
@@ -744,7 +796,7 @@ const AdminNews = () => {
                         <div className="action-btns-group" style={{ justifyContent: 'center' }}>
                           <button 
                             className="action-btn-circle view" 
-                            onClick={() => setViewingArticle(item)}
+                            onClick={() => handleViewArticle(item)}
                             title="View Post Details"
                           >
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>

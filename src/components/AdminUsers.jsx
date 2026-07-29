@@ -176,21 +176,76 @@ const AdminUsers = () => {
     setCurrentView('form');
   };
 
-  const handleEdit = (user) => {
-    setEditingUser(user);
-    setIsPinMasked(true);
-    setFormData({
-      name: user.name || '',
-      email: user.email || '',
-      phone: user.phone || '',
-      pin: ['•', '•', '•', '•'],
-      status: user.status || 'Active',
-      avatar: user.avatar || '',
-      avatarFile: null
-    });
-    setFormErrors({});
-    setErrorMsg('');
-    setCurrentView('form');
+  const handleEdit = async (user) => {
+    try {
+      const userId = user._id || user.id;
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      const fresh = (data.success && data.user) ? data.user : user;
+
+      const avatarPath = fresh.avatar || '';
+      setEditingUser({
+        ...fresh,
+        id: fresh._id || fresh.id
+      });
+      setIsPinMasked(true);
+      setFormData({
+        name: fresh.name || '',
+        email: fresh.email || '',
+        phone: fresh.phone || '',
+        pin: ['•', '•', '•', '•'],
+        status: fresh.status || 'Active',
+        avatar: avatarPath ? (avatarPath.startsWith('http') || avatarPath.startsWith('data:') ? avatarPath : `${API_BASE}${avatarPath.startsWith('/') ? '' : '/'}${avatarPath}`) : '',
+        avatarFile: null
+      });
+      setFormErrors({});
+      setErrorMsg('');
+      setCurrentView('form');
+    } catch (err) {
+      console.error('Error fetching single user details for edit:', err);
+      setEditingUser(user);
+      setIsPinMasked(true);
+      setFormData({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        pin: ['•', '•', '•', '•'],
+        status: user.status || 'Active',
+        avatar: user.avatar || '',
+        avatarFile: null
+      });
+      setFormErrors({});
+      setErrorMsg('');
+      setCurrentView('form');
+    }
+  };
+
+  const handleViewUser = async (user) => {
+    try {
+      const userId = user._id || user.id;
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        const fresh = data.user;
+        const avatarPath = fresh.avatar || '';
+        setViewingUser({
+          ...fresh,
+          id: fresh._id || fresh.id,
+          avatar: avatarPath ? (avatarPath.startsWith('http') || avatarPath.startsWith('data:') ? avatarPath : `${API_BASE}${avatarPath.startsWith('/') ? '' : '/'}${avatarPath}`) : ''
+        });
+      } else {
+        setViewingUser(user);
+      }
+    } catch (err) {
+      console.error('Error fetching single user details for view:', err);
+      setViewingUser(user);
+    }
   };
 
   const [deletingUserId, setDeletingUserId] = useState(null);
@@ -566,7 +621,7 @@ const AdminUsers = () => {
                           )}
                           <span
                             style={{ cursor: 'pointer', color: '#0f172a' }}
-                            onClick={() => setViewingUser(item)}
+                            onClick={() => handleViewUser(item)}
                             title="Click to view profile details"
                           >
                             {item.name}
@@ -584,7 +639,7 @@ const AdminUsers = () => {
                         <div className="action-btns-group" style={{ justifyContent: 'center' }}>
                           <button
                             className="action-btn-circle view"
-                            onClick={() => setViewingUser(item)}
+                            onClick={() => handleViewUser(item)}
                             title="View Profile Details & Picture"
                           >
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>

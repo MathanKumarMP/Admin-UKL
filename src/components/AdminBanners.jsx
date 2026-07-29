@@ -177,21 +177,76 @@ const AdminBanners = () => {
     setCurrentView('form');
   };
 
-  const handleEdit = (item) => {
-    setEditingBanner(item);
-    setSelectedFile(null);
-    setFormErrors({});
-    setErrorMsg('');
-    setFormData({
-      title: item.title,
-      pageName: item.pageName,
-      linkUrl: item.linkUrl || '',
-      status: item.status,
-      description: item.description || '',
-      img: item.img,
-      fileName: item.fileName || 'banner_image.png'
-    });
-    setCurrentView('form');
+  const handleEdit = async (item) => {
+    try {
+      const bannerId = item._id || item.id;
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/banners/${bannerId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      const fresh = (data.success && data.banner) ? data.banner : item;
+      const imgPath = fresh.image || fresh.img || '';
+
+      setEditingBanner({
+        ...fresh,
+        id: fresh._id || fresh.id
+      });
+      setSelectedFile(null);
+      setFormErrors({});
+      setErrorMsg('');
+      setFormData({
+        title: fresh.title || '',
+        pageName: fresh.pageName || 'Home Page',
+        linkUrl: fresh.linkUrl || '',
+        status: fresh.status || 'Active',
+        description: fresh.description || '',
+        img: imgPath ? (imgPath.startsWith('http') || imgPath.startsWith('data:') ? imgPath : `${API_BASE}${imgPath.startsWith('/') ? '' : '/'}${imgPath}`) : '',
+        fileName: imgPath ? imgPath.split('/').pop() : 'banner_image.png'
+      });
+      setCurrentView('form');
+    } catch (err) {
+      console.error('Error fetching single banner details for edit:', err);
+      setEditingBanner(item);
+      setSelectedFile(null);
+      setFormErrors({});
+      setErrorMsg('');
+      setFormData({
+        title: item.title,
+        pageName: item.pageName,
+        linkUrl: item.linkUrl || '',
+        status: item.status,
+        description: item.description || '',
+        img: item.img,
+        fileName: item.fileName || 'banner_image.png'
+      });
+      setCurrentView('form');
+    }
+  };
+
+  const handleViewBanner = async (item) => {
+    try {
+      const bannerId = item._id || item.id;
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/banners/${bannerId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.banner) {
+        const fresh = data.banner;
+        const imgPath = fresh.image || fresh.img || '';
+        setViewingBanner({
+          ...fresh,
+          id: fresh._id || fresh.id,
+          img: imgPath ? (imgPath.startsWith('http') || imgPath.startsWith('data:') ? imgPath : `${API_BASE}${imgPath.startsWith('/') ? '' : '/'}${imgPath}`) : ''
+        });
+      } else {
+        setViewingBanner(item);
+      }
+    } catch (err) {
+      console.error('Error fetching single banner details for view:', err);
+      setViewingBanner(item);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -398,7 +453,7 @@ const AdminBanners = () => {
                         <div className="action-btns-group" style={{ justifyContent: 'center' }}>
                           <button 
                             className="action-btn-circle view" 
-                            onClick={() => setViewingBanner(item)}
+                            onClick={() => handleViewBanner(item)}
                             title="View Banner Details"
                           >
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
