@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import logo from '../assets/favicon.png';
+import { API_BASE } from '../config';
 import AdminBanners from './AdminBanners';
 import AdminGallery from './AdminGallery';
 import AdminNews from './AdminNews';
@@ -59,6 +60,36 @@ const AdminLayout = ({ onLogout }) => {
     }
   });
 
+  // Automatically sync logged-in admin user details from server on load
+  useEffect(() => {
+    const fetchMe = async () => {
+      try {
+        const token = localStorage.getItem('adminToken');
+        if (!token) return;
+        const res = await fetch(`${API_BASE}/api/admin/auth/me`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+          localStorage.setItem('adminUser', JSON.stringify(data.user));
+        }
+      } catch (err) {
+        console.log('Error fetching user profile:', err);
+      }
+    };
+    fetchMe();
+
+    const handleUserUpdate = () => {
+      try {
+        const saved = localStorage.getItem('adminUser');
+        if (saved) setCurrentUser(JSON.parse(saved));
+      } catch (e) {}
+    };
+    window.addEventListener('adminUserUpdated', handleUserUpdate);
+    return () => window.removeEventListener('adminUserUpdated', handleUserUpdate);
+  }, []);
+
   // Close profile & notification dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -78,7 +109,11 @@ const AdminLayout = ({ onLogout }) => {
 
   const userName = currentUser?.name || 'Admin';
   const userEmail = currentUser?.email || currentUser?.phone || 'admin@uklinstruments.com';
-  const userAvatar = currentUser?.avatar || null;
+  const userAvatar = currentUser?.avatar
+    ? (currentUser.avatar.startsWith('http') ? currentUser.avatar : `${API_BASE}${currentUser.avatar}`)
+    : null;
+  const rawRole = currentUser?.role || 'admin';
+  const displayRole = rawRole === 'superadmin' ? 'Super Admin' : (rawRole.charAt(0).toUpperCase() + rawRole.slice(1));
 
   // FIRST LETTER ONLY (e.g. "Mathan" -> "M", "UKL Admin" -> "U")
   const firstLetter = userName.trim().charAt(0).toUpperCase() || 'A';
@@ -264,7 +299,7 @@ const AdminLayout = ({ onLogout }) => {
                 )}
                 <div className="profile-text-group">
                   <span className="profile-name">{userName}</span>
-                  <span className="profile-role">Manager</span>
+                  <span className="profile-role">{displayRole}</span>
                 </div>
                 <svg className="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <polyline points="6 9 12 15 18 9" />
