@@ -1362,7 +1362,7 @@ const AdminNews = () => {
                   <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Publish Status:</span>
                   <div style={{ marginTop: '2px' }}>
                     <span className={`status-pill ${viewingArticle.status === 'Active' ? 'published' : 'inactive'}`}>
-                      {viewingArticle.status === 'Active' ? '● Active' : '○ Inactive'}
+                      {viewingArticle.status === 'Active' ? 'Active' : 'Inactive'}
                     </span>
                   </div>
                 </div>

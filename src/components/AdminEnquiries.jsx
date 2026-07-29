@@ -175,7 +175,6 @@ const AdminEnquiries = () => {
       <div className="banner-list-header-bar">
         <div>
           <h2 className="banner-header-title">Customer Enquiries Management</h2>
-          <span className="header-subtitle-info">View, manage and download customer enquiries into Excel.</span>
         </div>
 
         <div>

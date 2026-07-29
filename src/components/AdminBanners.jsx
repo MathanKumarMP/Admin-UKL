@@ -602,7 +602,7 @@ const AdminBanners = () => {
                   <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Status:</span>
                   <div style={{ marginTop: '4px' }}>
                     <span className={`status-pill ${viewingBanner.status === 'Active' ? 'published' : 'inactive'}`}>
-                      {viewingBanner.status === 'Active' ? '● Active' : '○ Inactive'}
+                      {viewingBanner.status === 'Active' ? 'Active' : 'Inactive'}
                     </span>
                   </div>
                 </div>

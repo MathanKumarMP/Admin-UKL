@@ -273,6 +273,9 @@ const AdminGallery = () => {
       bodyFormData.append('category', formData.category || 'General');
       bodyFormData.append('status', formData.status);
 
+      const existingUrls = (formData.mediaList || []).filter(url => typeof url === 'string' && !url.startsWith('blob:'));
+      bodyFormData.append('existingUrls', JSON.stringify(existingUrls));
+
       selectedFiles.forEach((file) => {
         bodyFormData.append('mediaFiles', file);
       });
@@ -427,57 +430,88 @@ const AdminGallery = () => {
                       <tr key={item.id}>
                         <td className="sno-cell" style={{ textAlign: 'center' }}>{item.sNo}</td>
                         <td className="thumbnail-cell" style={{ textAlign: 'center' }}>
-                          <div className="gallery-thumbnail-wrapper-relative" style={{ display: 'inline-block', position: 'relative' }}>
-                            {isVideo ? (
-                              item.mediaUrl ? (
-                                <div className="video-thumbnail-preview-container" style={{ position: 'relative', display: 'inline-block', borderRadius: '8px', overflow: 'hidden' }}>
-                                  <video
-                                    src={item.mediaUrl}
-                                    className="table-thumb-img gallery-preview"
-                                    style={{ width: '60px', height: '44px', objectFit: 'cover', display: 'block', borderRadius: '8px', background: '#0f172a' }}
-                                    muted
-                                    preload="metadata"
-                                  />
-                                  <div style={{
-                                    position: 'absolute',
-                                    top: '50%',
-                                    left: '50%',
-                                    transform: 'translate(-50%, -50%)',
-                                    background: 'rgba(0, 0, 0, 0.65)',
-                                    color: '#ffffff',
-                                    borderRadius: '50%',
-                                    width: '22px',
-                                    height: '22px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '10px',
-                                    boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-                                    pointerEvents: 'none'
-                                  }}>▶</div>
-                                </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                            <div className="gallery-thumbnail-wrapper-relative" style={{ display: 'inline-block', position: 'relative', flexShrink: 0 }}>
+                              {isVideo ? (
+                                item.mediaUrl ? (
+                                  <div className="video-thumbnail-preview-container" style={{ position: 'relative', display: 'inline-block', borderRadius: '8px', overflow: 'hidden' }}>
+                                    <video
+                                      src={item.mediaUrl}
+                                      className="table-thumb-img gallery-preview"
+                                      style={{ width: '54px', height: '40px', objectFit: 'cover', display: 'block', borderRadius: '8px', background: '#0f172a' }}
+                                      muted
+                                      preload="metadata"
+                                    />
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '50%',
+                                      left: '50%',
+                                      transform: 'translate(-50%, -50%)',
+                                      background: 'rgba(0, 0, 0, 0.65)',
+                                      color: '#ffffff',
+                                      borderRadius: '50%',
+                                      width: '20px',
+                                      height: '20px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '9px',
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                                      pointerEvents: 'none'
+                                    }}>▶</div>
+                                  </div>
+                                ) : (
+                                  <div className="video-thumb-preview-placeholder">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#004dad' }}>
+                                      <polygon points="23 7 16 12 23 17 23 7" />
+                                      <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                                    </svg>
+                                  </div>
+                                )
                               ) : (
-                                <div className="video-thumb-preview-placeholder">
-                                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#004dad' }}>
-                                    <polygon points="23 7 16 12 23 17 23 7" />
-                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                                  </svg>
-                                </div>
-                              )
-                            ) : (
-                              item.mediaUrl && (
-                                <img 
-                                  src={item.mediaUrl} 
-                                  alt={item.title} 
-                                  className="table-thumb-img gallery-preview" 
-                                  onError={(e) => {
-                                    e.target.onerror = null;
-                                    e.target.src = 'https://placehold.co/100x70/e2e8f0/475569?text=Gallery';
-                                  }}
-                                />
-                              )
-                            )}
-                            <span className="media-count-indicator-tag">{count} Files</span>
+                                item.mediaUrl && (
+                                  <img 
+                                    src={item.mediaUrl} 
+                                    alt={item.title} 
+                                    className="table-thumb-img gallery-preview" 
+                                    style={{ width: '54px', height: '40px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.src = 'https://placehold.co/100x70/e2e8f0/475569?text=Gallery';
+                                    }}
+                                  />
+                                )
+                              )}
+                            </div>
+
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              fontSize: '11.5px',
+                              fontWeight: 700,
+                              backgroundColor: isVideo ? '#f0f9ff' : '#f8fafc',
+                              color: isVideo ? '#0284c7' : '#334155',
+                              border: isVideo ? '1px solid #bae6fd' : '1px solid #cbd5e1',
+                              whiteSpace: 'nowrap',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                            }}>
+                              {isVideo ? (
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                  <polygon points="23 7 16 12 23 17 23 7" />
+                                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                                </svg>
+                              ) : (
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                  <circle cx="8.5" cy="8.5" r="1.5" />
+                                  <polyline points="21 15 16 10 5 21" />
+                                </svg>
+                              )}
+                              {count} {count === 1 ? 'File' : 'Files'}
+                            </span>
                           </div>
                         </td>
                         <td style={{ fontWeight: '700', color: '#1e293b', textAlign: 'center' }}>
@@ -804,7 +838,7 @@ const AdminGallery = () => {
                   <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Status:</span>
                   <div style={{ marginTop: '4px' }}>
                     <span className={`status-pill ${viewingItem.status === 'Active' ? 'published' : 'inactive'}`}>
-                      {viewingItem.status === 'Active' ? '● Active' : '○ Inactive'}
+                      {viewingItem.status === 'Active' ? 'Active' : 'Inactive'}
                     </span>
                   </div>
                 </div>

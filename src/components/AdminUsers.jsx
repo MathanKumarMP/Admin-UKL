@@ -31,6 +31,7 @@ const AdminUsers = () => {
   const [formErrors, setFormErrors] = useState({});
   const [toast, setToast] = useState(null);
   const [focusedPinIndex, setFocusedPinIndex] = useState(null);
+  const [isPinMasked, setIsPinMasked] = useState(false);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -169,6 +170,7 @@ const AdminUsers = () => {
   const handleOpenAddForm = () => {
     setFormData(defaultFormData);
     setEditingUser(null);
+    setIsPinMasked(false);
     setFormErrors({});
     setErrorMsg('');
     setCurrentView('form');
@@ -176,11 +178,12 @@ const AdminUsers = () => {
 
   const handleEdit = (user) => {
     setEditingUser(user);
+    setIsPinMasked(true);
     setFormData({
       name: user.name || '',
       email: user.email || '',
       phone: user.phone || '',
-      pin: user.pin ? [...user.pin] : ['', '', '', ''],
+      pin: ['•', '•', '•', '•'],
       status: user.status || 'Active',
       avatar: user.avatar || '',
       avatarFile: null
@@ -253,8 +256,8 @@ const AdminUsers = () => {
       errors.phone = 'Must be 10 digits';
     }
 
-    const pinStr = formData.pin.join('');
-    if (pinStr.length < 4) {
+    let pinStr = formData.pin.join('');
+    if (!isPinMasked && pinStr.length < 4) {
       errors.pin = '4-digit PIN is required';
     }
 
@@ -274,7 +277,9 @@ const AdminUsers = () => {
       bodyFormData.append('name', formData.name);
       bodyFormData.append('email', formData.email);
       bodyFormData.append('phone', formData.phone);
-      bodyFormData.append('pin', pinStr);
+      if (!isPinMasked && pinStr.length === 4) {
+        bodyFormData.append('pin', pinStr);
+      }
       bodyFormData.append('status', formData.status);
       if (formData.avatarFile) {
         bodyFormData.append('avatar', formData.avatarFile);
@@ -741,22 +746,45 @@ const AdminUsers = () => {
                       {formErrors.pin && <span className="field-error-text">{formErrors.pin}</span>}
                     </div>
                     <div className="pin-inputs-flex">
-                      {[0, 1, 2, 3].map(idx => (
-                        <input
-                          key={idx}
-                          id={`pin-input-${idx}`}
-                          type={focusedPinIndex !== null ? 'text' : 'password'}
-                          maxLength="1"
-                          autoComplete="new-password"
-                          className={`pin-digit-box ${formErrors.pin ? 'input-field-error' : ''}`}
-                          style={{ backgroundColor: '#ffffff' }}
-                          value={formData.pin[idx] || ''}
-                          onChange={(e) => handlePinChange(idx, e.target.value)}
-                          onKeyDown={(e) => handlePinKeyDown(idx, e)}
-                          onFocus={() => setFocusedPinIndex(idx)}
-                          onBlur={() => setFocusedPinIndex(null)}
-                        />
-                      ))}
+                      {[0, 1, 2, 3].map(idx => {
+                        const displayVal = isPinMasked ? '•' : (formData.pin[idx] || '');
+                        return (
+                          <input
+                            key={idx}
+                            id={`pin-input-${idx}`}
+                            type="text"
+                            maxLength="1"
+                            autoComplete="off"
+                            className={`pin-digit-box ${formErrors.pin ? 'input-field-error' : ''}`}
+                            style={{ backgroundColor: '#ffffff', textAlign: 'center', fontSize: isPinMasked ? '18px' : '16px' }}
+                            value={displayVal}
+                            onChange={(e) => {
+                              if (isPinMasked) {
+                                setIsPinMasked(false);
+                                const numVal = e.target.value.replace(/\D/g, '').slice(-1);
+                                const newPin = ['', '', '', ''];
+                                newPin[idx] = numVal;
+                                setFormData(prev => ({ ...prev, pin: newPin }));
+                                if (numVal && idx < 3) {
+                                  const nextInput = document.getElementById(`pin-input-${idx + 1}`);
+                                  if (nextInput) nextInput.focus();
+                                }
+                              } else {
+                                handlePinChange(idx, e.target.value);
+                              }
+                            }}
+                            onKeyDown={(e) => handlePinKeyDown(idx, e)}
+                            onFocus={() => {
+                              if (isPinMasked) {
+                                setIsPinMasked(false);
+                                setFormData(prev => ({ ...prev, pin: ['', '', '', ''] }));
+                              }
+                              setFocusedPinIndex(idx);
+                            }}
+                            onBlur={() => setFocusedPinIndex(null)}
+                          />
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -885,7 +913,7 @@ const AdminUsers = () => {
                 <div style={{ fontSize: '13.5px', color: '#475569', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <strong>Status:</strong>
                   <span className={`status-pill ${viewingUser.status === 'Active' ? 'active' : 'inactive'}`}>
-                    • {viewingUser.status}
+                     {viewingUser.status}
                   </span>
                 </div>
               </div>
