@@ -57,7 +57,8 @@ const AdminUsers = () => {
       const data = await response.json();
       if (data.success && data.users) {
         const startNo = ((data.page || page) - 1) * limit;
-        const mapped = data.users.map((item, index) => ({
+        const validUsers = data.users.filter(u => u.role !== 'superadmin' && u.email !== 'admin@uklinstruments.com' && u.phone !== '9988776655');
+        const mapped = validUsers.map((item, index) => ({
           id: item._id || String(index + 1),
           sNo: startNo + index + 1,
           name: item.name || '',
@@ -571,7 +572,7 @@ const AdminUsers = () => {
                       <td style={{ textAlign: 'left', color: '#475569' }}>{item.phone}</td>
                       <td style={{ textAlign: 'center' }}>
                         <span className={`status-pill ${item.status === 'Active' ? 'active' : 'inactive'}`}>
-                          • {item.status}
+                           {item.status}
                         </span>
                       </td>
                       <td className="action-cell" style={{ textAlign: 'center' }}>

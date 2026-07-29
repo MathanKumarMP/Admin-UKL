@@ -717,6 +717,8 @@ body {
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
+  background-color: #dcfce7;
+  color: #15803d;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;

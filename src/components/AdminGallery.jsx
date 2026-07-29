@@ -488,7 +488,7 @@ const AdminGallery = () => {
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <span className={`status-pill ${item.status === 'Active' ? 'published' : 'inactive'}`}>
-                            {item.status === 'Active' ? '● Active' : '○ Inactive'}
+                            {item.status === 'Active' ? 'Active' : 'Inactive'}
                           </span>
                         </td>
                         <td className="action-cell" style={{ textAlign: 'center' }}>
