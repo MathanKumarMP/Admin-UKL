@@ -976,7 +976,7 @@ const AdminNews = () => {
                         onChange={handleFileChange}
                         className="hidden-file-input"
                       />
-                      <label htmlFor="newsThumbnailFile" className="btn-choose-file-tag">
+                      <label style={{ color: 'white' }} htmlFor="newsThumbnailFile" className="btn-choose-file-tag">
                         Upload Thumbnail
                       </label>
                       <span className="file-name-indicator-span">{formData.thumbnailFileName}</span>
@@ -1012,11 +1012,12 @@ const AdminNews = () => {
                   />
                 </div>
 
-                {/* Author - Hidden as requested */}
+                {/* Author Name */}
                 <div className="form-group">
-                  <label>Author</label>
+                  <label>Author Name</label>
                   <input 
                     type="text"
+                    placeholder="Enter Author Name (e.g. UKL Team)"
                     value={formData.author}
                     onChange={(e) => setFormData({ ...formData, author: e.target.value })}
                   />
