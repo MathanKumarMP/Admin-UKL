@@ -89,13 +89,19 @@ const AdminLogin = ({ onLoginSuccess }) => {
 
       if (data.success) {
         const newSessionId = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 9);
+        const userId = data.user?._id || data.user?.phone || data.user?.email || '';
+
+        sessionStorage.setItem('adminToken', data.token);
+        sessionStorage.setItem('adminUser', JSON.stringify(data.user));
+        sessionStorage.setItem('adminSessionId', newSessionId);
+
         localStorage.setItem('adminToken', data.token);
         localStorage.setItem('adminUser', JSON.stringify(data.user));
         localStorage.setItem('adminSessionId', newSessionId);
 
         try {
           const authChannel = new BroadcastChannel('ukl_admin_session');
-          authChannel.postMessage({ type: 'NEW_LOGIN', sessionId: newSessionId });
+          authChannel.postMessage({ type: 'NEW_LOGIN', userId: userId, sessionId: newSessionId });
           authChannel.close();
         } catch (e) {
           console.log(e);

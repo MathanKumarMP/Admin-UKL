@@ -64,7 +64,7 @@ const AdminLayout = ({ onLogout }) => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const token = localStorage.getItem('adminToken');
+        const token = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken');
         if (!token) return;
         const res = await fetch(`${API_BASE}/api/admin/auth/profile`, {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -72,6 +72,7 @@ const AdminLayout = ({ onLogout }) => {
         const data = await res.json();
         if (data.success && data.user) {
           setCurrentUser(data.user);
+          sessionStorage.setItem('adminUser', JSON.stringify(data.user));
           localStorage.setItem('adminUser', JSON.stringify(data.user));
         }
       } catch (err) {
@@ -82,7 +83,7 @@ const AdminLayout = ({ onLogout }) => {
 
     const handleUserUpdate = () => {
       try {
-        const saved = localStorage.getItem('adminUser');
+        const saved = sessionStorage.getItem('adminUser') || localStorage.getItem('adminUser');
         if (saved) setCurrentUser(JSON.parse(saved));
       } catch (e) { }
     };

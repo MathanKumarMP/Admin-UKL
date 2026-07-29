@@ -4,18 +4,35 @@ import AdminLogin from './components/AdminLogin';
 import './styles/Admin.css';
 
 function App() {
-  // Synchronously initialize auth state from localStorage so refreshing (F5) retains login
+  const getStoredToken = () => {
+    return sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || sessionStorage.getItem('userToken') || localStorage.getItem('userToken');
+  };
+
+  const getStoredUser = () => {
+    try {
+      const raw = sessionStorage.getItem('adminUser') || localStorage.getItem('adminUser');
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const getStoredSessionId = () => {
+    return sessionStorage.getItem('adminSessionId') || localStorage.getItem('adminSessionId');
+  };
+
+  // Synchronously initialize auth state from sessionStorage / localStorage so refreshing (F5) retains login
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    const token = localStorage.getItem('adminToken') || localStorage.getItem('userToken');
+    const token = getStoredToken();
     return Boolean(token && token !== 'null' && token !== 'undefined');
   });
 
   const [loading, setLoading] = useState(false);
-  const tabSessionIdRef = useRef(localStorage.getItem('adminSessionId'));
+  const tabSessionIdRef = useRef(getStoredSessionId());
 
   useEffect(() => {
-    const token = localStorage.getItem('adminToken') || localStorage.getItem('userToken');
-    const sessionId = localStorage.getItem('adminSessionId');
+    const token = getStoredToken();
+    const sessionId = getStoredSessionId();
 
     if (token && token !== 'null' && token !== 'undefined') {
       setIsAuthenticated(true);
@@ -25,16 +42,22 @@ function App() {
     }
   }, []);
 
-  // Enforce single active tab session across browser tabs
+  // Enforce same-user single-session logout across browser tabs
   useEffect(() => {
     let authChannel;
     try {
       authChannel = new BroadcastChannel('ukl_admin_session');
       authChannel.onmessage = (event) => {
         if (event.data && event.data.type === 'NEW_LOGIN' && event.data.sessionId) {
-          // If a new login occurred in another tab, log out this previous tab
-          if (tabSessionIdRef.current && tabSessionIdRef.current !== event.data.sessionId) {
-            handleLogout();
+          const currentUser = getStoredUser();
+          const currentUserId = currentUser?._id || currentUser?.phone || currentUser?.email || '';
+          const newUserId = event.data.userId;
+
+          // ONLY log out if the SAME user account logged in again in another tab
+          if (currentUserId && newUserId && String(currentUserId) === String(newUserId)) {
+            if (tabSessionIdRef.current && tabSessionIdRef.current !== event.data.sessionId) {
+              handleLogout();
+            }
           }
         }
       };
@@ -42,35 +65,27 @@ function App() {
       console.log('BroadcastChannel not supported');
     }
 
-    const handleStorageChange = (e) => {
-      if (e.key === 'adminSessionId' && e.newValue) {
-        if (tabSessionIdRef.current && tabSessionIdRef.current !== e.newValue) {
-          handleLogout();
-        }
-      }
-      if (e.key === 'adminToken' && !e.newValue) {
-        handleLogout();
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-
     return () => {
       if (authChannel) authChannel.close();
-      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
   const handleLoginSuccess = (user, sessionId) => {
-    tabSessionIdRef.current = sessionId || localStorage.getItem('adminSessionId');
+    tabSessionIdRef.current = sessionId || getStoredSessionId();
     setIsAuthenticated(true);
   };
 
   const handleLogout = () => {
+    sessionStorage.removeItem('adminToken');
+    sessionStorage.removeItem('adminUser');
+    sessionStorage.removeItem('adminSessionId');
+    sessionStorage.removeItem('userToken');
+
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminUser');
     localStorage.removeItem('adminSessionId');
     localStorage.removeItem('userToken');
+
     tabSessionIdRef.current = null;
     setIsAuthenticated(false);
   };
