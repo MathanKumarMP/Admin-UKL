@@ -88,9 +88,30 @@ const AdminLogin = ({ onLoginSuccess }) => {
       const data = await response.json();
 
       if (data.success) {
+        let userObj = data.user;
+
+        // Check if there is a matching user created in admin users (e.g. MATHAN)
+        try {
+          const savedLocal = localStorage.getItem('ukl_created_admin_users');
+          if (savedLocal) {
+            const parsedLocal = JSON.parse(savedLocal);
+            const foundLocalUser = parsedLocal.find(u => u.phone === phone || u.email === phone);
+            if (foundLocalUser) {
+              userObj = {
+                _id: foundLocalUser.id || foundLocalUser._id || userObj._id,
+                name: foundLocalUser.name,
+                email: foundLocalUser.email,
+                phone: foundLocalUser.phone,
+                role: foundLocalUser.role || 'admin',
+                avatar: foundLocalUser.avatar || ''
+              };
+            }
+          }
+        } catch (e) {}
+
         const newSessionId = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 9);
         localStorage.setItem('adminToken', data.token);
-        localStorage.setItem('adminUser', JSON.stringify(data.user));
+        localStorage.setItem('adminUser', JSON.stringify(userObj));
         localStorage.setItem('adminSessionId', newSessionId);
 
         try {
@@ -105,7 +126,7 @@ const AdminLogin = ({ onLoginSuccess }) => {
         showToast(data.message, 'success');
         setTimeout(() => {
           if (onLoginSuccess) {
-            onLoginSuccess(data.user, newSessionId);
+            onLoginSuccess(userObj, newSessionId);
           }
         }, 1000);
       } else {

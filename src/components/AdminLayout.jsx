@@ -71,8 +71,18 @@ const AdminLayout = ({ onLogout }) => {
         });
         const data = await res.json();
         if (data.success && data.user) {
-          setCurrentUser(data.user);
-          localStorage.setItem('adminUser', JSON.stringify(data.user));
+          let userToSave = data.user;
+          try {
+            const savedAdminUser = localStorage.getItem('adminUser');
+            if (savedAdminUser) {
+              const parsedSaved = JSON.parse(savedAdminUser);
+              if (parsedSaved.name && parsedSaved.name !== 'UKL Admin' && parsedSaved.name !== 'Admin') {
+                userToSave = { ...data.user, ...parsedSaved };
+              }
+            }
+          } catch (e) {}
+          setCurrentUser(userToSave);
+          localStorage.setItem('adminUser', JSON.stringify(userToSave));
         }
       } catch (err) {
         console.log('Error fetching user profile:', err);
