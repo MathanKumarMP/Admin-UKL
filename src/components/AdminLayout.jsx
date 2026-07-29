@@ -241,8 +241,8 @@ const AdminLayout = ({ onLogout }) => {
               />
             </div> */}
 
-            {/* Notification Bell Icon */}
-            <div className="notification-wrapper" ref={notificationRef}>
+            {/* Notification Bell Icon - Removed */}
+            {/* <div className="notification-wrapper" ref={notificationRef}>
               <button 
                 className="icon-btn-badge"
                 onClick={() => setShowNotifications(!showNotifications)}
@@ -273,7 +273,7 @@ const AdminLayout = ({ onLogout }) => {
                   </div>
                 </div>
               )}
-            </div>
+            </div> */}
 
             {/* User Profile Badge */}
             <div className="profile-wrapper" ref={profileRef}>

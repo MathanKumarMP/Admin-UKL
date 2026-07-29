@@ -946,7 +946,18 @@ const AdminNews = () => {
                   </div>
                   <div className={`thumbnail-upload-dropzone ${formErrors.thumbnail ? 'input-field-error' : ''}`}>
                     <div className="dropzone-media-preview-container">
-                      <img src={formData.thumbnail} alt="Upload preview" className="dropzone-preview-img" />
+                      {formData.thumbnail ? (
+                        <img src={formData.thumbnail} alt="Upload preview" className="dropzone-preview-img" />
+                      ) : (
+                        <div className="dropzone-preview-placeholder" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', height: '100%', color: '#94a3b8' }}>
+                          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                          </svg>
+                          <span style={{ fontSize: '13px', fontWeight: '500' }}>Upload preview</span>
+                        </div>
+                      )}
                     </div>
                     <div className="dropzone-controls">
                       <input 
@@ -992,6 +1003,7 @@ const AdminNews = () => {
                   />
                 </div>
 
+                {/* Author - Hidden as requested */}
                 <div className="form-group">
                   <label>Author</label>
                   <input 
@@ -1001,8 +1013,8 @@ const AdminNews = () => {
                   />
                 </div>
 
-                {/* Category selection */}
-                <div className="form-group">
+                {/* Category selection - Hidden as requested */}
+                {/* <div className="form-group">
                   <label>Category</label>
                   <select
                     value={formData.category}
@@ -1016,10 +1028,10 @@ const AdminNews = () => {
                       );
                     })}
                   </select>
-                </div>
+                </div> */}
 
-                {/* Tags checkbox selection */}
-                <div className="form-group">
+                {/* Tags checkbox selection - Hidden as requested */}
+                {/* <div className="form-group">
                   <label>Tags Selection</label>
                   <div className="tags-checkbox-multi-grid">
                     {tags.map((tag, idx) => {
@@ -1037,10 +1049,10 @@ const AdminNews = () => {
                       );
                     })}
                   </div>
-                </div>
+                </div> */}
 
-                {/* Switches / Checkboxes */}
-                <div className="form-group inline-switches-group">
+                {/* Switches / Checkboxes - Hidden as requested */}
+                {/* <div className="form-group inline-switches-group">
                   <label className="switch-container-label">
                     <input 
                       type="checkbox"
@@ -1060,9 +1072,9 @@ const AdminNews = () => {
                     <span className="slider-switch-span"></span>
                     <span className="switch-text-label">Mark as "Latest Article"</span>
                   </label>
-                </div>
+                </div> */}
 
-                {/* Status selection */}
+                {/* Status selection - Hidden as requested */}
                 <div className="form-group">
                   <label>Publish Status</label>
                   <select

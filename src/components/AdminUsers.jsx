@@ -293,6 +293,25 @@ const AdminUsers = () => {
       });
       const data = await response.json();
       if (data.success) {
+        // If logged-in admin user updated their own record, update localStorage & header state
+        try {
+          const savedUser = localStorage.getItem('adminUser');
+          if (savedUser) {
+            const parsed = JSON.parse(savedUser);
+            if (parsed.phone === formData.phone || (editingUser && parsed._id === editingUser.id)) {
+              const updatedObj = {
+                ...parsed,
+                name: formData.name,
+                email: formData.email,
+                phone: formData.phone,
+                avatar: data.user?.avatar ? `${API_BASE}${data.user.avatar}` : (formData.avatar || parsed.avatar)
+              };
+              localStorage.setItem('adminUser', JSON.stringify(updatedObj));
+              window.dispatchEvent(new Event('adminUserUpdated'));
+            }
+          }
+        } catch (e) {}
+
         setCurrentView('list');
         setEditingUser(null);
         setFormData(defaultFormData);

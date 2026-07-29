@@ -843,7 +843,7 @@ body {
   font-size: 13px;
   font-weight: 700;
   padding-top: 15px;
-  color: #334155;
+  color: #000000;
 }
 
 .form-group input,
@@ -2258,7 +2258,7 @@ body {
 }
 
 .btn-choose-file-tag {
-  background-color: #004dad;
+  background: linear-gradient(135deg, #004dad, #4BAD49) !important;
   color: #ffffff;
   padding: 8px 16px;
   border-radius: 6px;
