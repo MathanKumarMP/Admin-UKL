@@ -65,7 +65,7 @@ const AdminUsers = () => {
           phone: item.phone || '',
           pin: item.pin ? String(item.pin).split('') : ['2', '0', '2', '6'],
           status: item.status || 'Active',
-          avatar: item.avatar ? `${API_BASE}${item.avatar}` : ''
+          avatar: item.avatar ? (item.avatar.startsWith('http') || item.avatar.startsWith('data:') ? item.avatar : `${API_BASE}${item.avatar.startsWith('/') ? '' : '/'}${item.avatar}`) : ''
         }));
         setUsers(mapped);
         setTotalEntries(data.total !== undefined ? data.total : mapped.length);
@@ -293,25 +293,6 @@ const AdminUsers = () => {
       });
       const data = await response.json();
       if (data.success) {
-        // If logged-in admin user updated their own record, update localStorage & header state
-        try {
-          const savedUser = localStorage.getItem('adminUser');
-          if (savedUser) {
-            const parsed = JSON.parse(savedUser);
-            if (parsed.phone === formData.phone || (editingUser && parsed._id === editingUser.id)) {
-              const updatedObj = {
-                ...parsed,
-                name: formData.name,
-                email: formData.email,
-                phone: formData.phone,
-                avatar: data.user?.avatar ? `${API_BASE}${data.user.avatar}` : (formData.avatar || parsed.avatar)
-              };
-              localStorage.setItem('adminUser', JSON.stringify(updatedObj));
-              window.dispatchEvent(new Event('adminUserUpdated'));
-            }
-          }
-        } catch (e) {}
-
         setCurrentView('list');
         setEditingUser(null);
         setFormData(defaultFormData);
@@ -551,6 +532,7 @@ const AdminUsers = () => {
                                 flexShrink: 0
                               }}
                               onClick={() => setViewingUser(item)}
+                              onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
                               title="Click to view profile picture"
                             />
                           ) : (
@@ -861,6 +843,10 @@ const AdminUsers = () => {
                     margin: '0 auto 20px auto',
                     display: 'block',
                     backgroundColor: '#f8fafc'
+                  }}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.style.display = 'none';
                   }}
                 />
               ) : (

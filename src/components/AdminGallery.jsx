@@ -74,7 +74,7 @@ const AdminGallery = () => {
           // Map type to capitalise 'Image' or 'Video'
           const mediaType = item.type === 'video' ? 'Video' : 'Image';
           // Convert relative /uploads paths to full server URLs
-          const mediaList = item.mediaUrls.map(url => url.startsWith('http') ? url : `${API_BASE}${url}`);
+          const mediaList = item.mediaUrls.map(url => (url.startsWith('http') || url.startsWith('data:') ? url : `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`));
           return {
             id: item._id,
             sNo: startNo + index + 1,
@@ -465,7 +465,17 @@ const AdminGallery = () => {
                                 </div>
                               )
                             ) : (
-                              item.mediaUrl && <img src={item.mediaUrl} alt={item.title} className="table-thumb-img gallery-preview" />
+                              item.mediaUrl && (
+                                <img 
+                                  src={item.mediaUrl} 
+                                  alt={item.title} 
+                                  className="table-thumb-img gallery-preview" 
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = 'https://placehold.co/100x70/e2e8f0/475569?text=Gallery';
+                                  }}
+                                />
+                              )
                             )}
                             <span className="media-count-indicator-tag">{count} Files</span>
                           </div>

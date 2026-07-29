@@ -97,7 +97,7 @@ const AdminNews = () => {
           sNo: startNo + index + 1,
           title: item.title || '',
           slug: item.slug || '',
-          thumbnail: item.thumbnail ? (item.thumbnail.startsWith('http') ? item.thumbnail : `${API_BASE}${item.thumbnail}`) : newsImg1,
+          thumbnail: item.thumbnail ? (item.thumbnail.startsWith('http') || item.thumbnail.startsWith('data:') ? item.thumbnail : `${API_BASE}${item.thumbnail.startsWith('/') ? '' : '/'}${item.thumbnail}`) : newsImg1,
           metaTitle: item.metaTitle || '',
           metaDescription: item.metaDescription || '',
           metaKeyword: item.metaKeyword || '',
@@ -727,7 +727,16 @@ const AdminNews = () => {
                       <td className="title-cell" style={{ textAlign: 'left', fontWeight: 600, color: '#0f172a' }}>{item.title}</td>
                       <td className="slug-cell" style={{ textAlign: 'left' }}>{item.slug}</td>
                       <td className="thumbnail-cell" style={{ textAlign: 'center' }}>
-                        <img src={item.thumbnail} alt={item.title} className="table-thumb-img" style={{ width: '48px', height: '38px', borderRadius: '6px', objectFit: 'cover' }} />
+                        <img 
+                          src={item.thumbnail} 
+                          alt={item.title} 
+                          className="table-thumb-img" 
+                          style={{ width: '48px', height: '38px', borderRadius: '6px', objectFit: 'cover' }} 
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = newsImg1;
+                          }}
+                        />
                       </td>
                       <td className="meta-title-cell" style={{ textAlign: 'left' }}>{item.metaTitle}</td>
                       <td className="meta-desc-cell" style={{ textAlign: 'left' }}>{item.metaDescription}</td>
@@ -1302,7 +1311,15 @@ const AdminNews = () => {
             </div>
 
             <div className="slideshow-giant-window" style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', height: '240px', marginBottom: '16px' }}>
-              <img src={viewingArticle.thumbnail} alt={viewingArticle.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img 
+                src={viewingArticle.thumbnail} 
+                alt={viewingArticle.title} 
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = newsImg1;
+                }}
+              />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '13.5px' }}>
@@ -1355,7 +1372,7 @@ const AdminNews = () => {
               <button type="button" className="btn-secondary-dark" onClick={() => setViewingArticle(null)}>
                 Close
               </button>
-              <button 
+              {/* <button 
                 type="button" 
                 className="btn-save-banner-filled"
                 onClick={() => {
@@ -1364,7 +1381,7 @@ const AdminNews = () => {
                 }}
               >
                 Edit Post
-              </button>
+              </button> */}
             </div>
           </div>
         </div>

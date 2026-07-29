@@ -67,7 +67,7 @@ const AdminBanners = () => {
           title: item.title || '',
           pageName: item.pageName || 'Home Page',
           status: item.status || 'Active',
-          img: item.image ? `${API_BASE}${item.image}` : '',
+          img: item.image ? (item.image.startsWith('http') || item.image.startsWith('data:') ? item.image : `${API_BASE}${item.image.startsWith('/') ? '' : '/'}${item.image}`) : '',
           fileName: item.image ? item.image.split('/').pop() : '',
           description: item.description || '',
           linkUrl: item.linkUrl || '',
@@ -372,7 +372,16 @@ const AdminBanners = () => {
                       <td className="sno-cell" style={{ textAlign: 'center' }}>{item.sNo}</td>
                       <td className="thumbnail-cell" style={{ textAlign: 'center' }}>
                         {item.img ? (
-                          <img src={item.img} alt={item.pageName} className="table-thumb-img banner-media-preview" style={{ display: 'inline-block' }} />
+                          <img 
+                            src={item.img} 
+                            alt={item.pageName} 
+                            className="table-thumb-img banner-media-preview" 
+                            style={{ display: 'inline-block' }} 
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = 'https://placehold.co/120x80/e2e8f0/475569?text=Banner';
+                            }}
+                          />
                         ) : (
                           <span style={{ fontSize: '12px', color: '#64748b' }}>No Image</span>
                         )}
@@ -574,6 +583,10 @@ const AdminBanners = () => {
                   src={viewingBanner.img} 
                   alt={viewingBanner.title} 
                   style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #e2e8f0' }} 
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = 'https://placehold.co/600x300/e2e8f0/475569?text=Banner+Image';
+                  }}
                 />
               )}
               

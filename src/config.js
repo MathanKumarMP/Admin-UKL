@@ -17,7 +17,7 @@ switch (APP_ENV) {
     case "dev":
     case "local":
     default:
-        server = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_URL) || "https://ukl-backend-uda2.onrender.com";
+        server = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_URL) || "http://localhost:5000";
         break;
 }
 

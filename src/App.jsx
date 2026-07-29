@@ -4,18 +4,25 @@ import AdminLogin from './components/AdminLogin';
 import './styles/Admin.css';
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const tabSessionIdRef = useRef(null);
+  // Synchronously initialize auth state from localStorage so refreshing (F5) retains login
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    const token = localStorage.getItem('adminToken') || localStorage.getItem('userToken');
+    return Boolean(token && token !== 'null' && token !== 'undefined');
+  });
+
+  const [loading, setLoading] = useState(false);
+  const tabSessionIdRef = useRef(localStorage.getItem('adminSessionId'));
 
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
+    const token = localStorage.getItem('adminToken') || localStorage.getItem('userToken');
     const sessionId = localStorage.getItem('adminSessionId');
-    if (token) {
+
+    if (token && token !== 'null' && token !== 'undefined') {
       setIsAuthenticated(true);
       tabSessionIdRef.current = sessionId;
+    } else {
+      setIsAuthenticated(false);
     }
-    setLoading(false);
   }, []);
 
   // Enforce single active tab session across browser tabs
@@ -24,9 +31,9 @@ function App() {
     try {
       authChannel = new BroadcastChannel('ukl_admin_session');
       authChannel.onmessage = (event) => {
-        if (event.data && event.data.type === 'NEW_LOGIN') {
+        if (event.data && event.data.type === 'NEW_LOGIN' && event.data.sessionId) {
           // If a new login occurred in another tab, log out this previous tab
-          if (tabSessionIdRef.current !== event.data.sessionId) {
+          if (tabSessionIdRef.current && tabSessionIdRef.current !== event.data.sessionId) {
             handleLogout();
           }
         }
@@ -63,12 +70,17 @@ function App() {
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminUser');
     localStorage.removeItem('adminSessionId');
+    localStorage.removeItem('userToken');
     tabSessionIdRef.current = null;
     setIsAuthenticated(false);
   };
 
   if (loading) {
-    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#0f172a', color: '#ffffff' }}>Loading...</div>;
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#0f172a', color: '#ffffff' }}>
+        Loading...
+      </div>
+    );
   }
 
   return (

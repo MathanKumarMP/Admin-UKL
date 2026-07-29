@@ -62,39 +62,29 @@ const AdminLayout = ({ onLogout }) => {
 
   // Automatically sync logged-in admin user details from server on load
   useEffect(() => {
-    const fetchMe = async () => {
+    const fetchProfile = async () => {
       try {
         const token = localStorage.getItem('adminToken');
         if (!token) return;
-        const res = await fetch(`${API_BASE}/api/admin/auth/me`, {
+        const res = await fetch(`${API_BASE}/api/admin/auth/profile`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();
         if (data.success && data.user) {
-          let userToSave = data.user;
-          try {
-            const savedAdminUser = localStorage.getItem('adminUser');
-            if (savedAdminUser) {
-              const parsedSaved = JSON.parse(savedAdminUser);
-              if (parsedSaved.name && parsedSaved.name !== 'UKL Admin' && parsedSaved.name !== 'Admin') {
-                userToSave = { ...data.user, ...parsedSaved };
-              }
-            }
-          } catch (e) {}
-          setCurrentUser(userToSave);
-          localStorage.setItem('adminUser', JSON.stringify(userToSave));
+          setCurrentUser(data.user);
+          localStorage.setItem('adminUser', JSON.stringify(data.user));
         }
       } catch (err) {
         console.log('Error fetching user profile:', err);
       }
     };
-    fetchMe();
+    fetchProfile();
 
     const handleUserUpdate = () => {
       try {
         const saved = localStorage.getItem('adminUser');
         if (saved) setCurrentUser(JSON.parse(saved));
-      } catch (e) {}
+      } catch (e) { }
     };
     window.addEventListener('adminUserUpdated', handleUserUpdate);
     return () => window.removeEventListener('adminUserUpdated', handleUserUpdate);
@@ -208,13 +198,13 @@ const AdminLayout = ({ onLogout }) => {
       {/* Top Navigation Header Bar */}
       <header className="top-navbar-header">
         <div className="navbar-container">
-          
+
           {/* Brand Logo & Title */}
           <div className="navbar-brand-section">
             <div className="brand-logo-wrapper">
               <img src={logo} alt="UKL Admin Logo" className="brand-logo-img" />
             </div>
-            
+
           </div>
 
           {/* Center Horizontal Navigation Bar */}
@@ -287,7 +277,7 @@ const AdminLayout = ({ onLogout }) => {
 
             {/* User Profile Badge */}
             <div className="profile-wrapper" ref={profileRef}>
-              <button 
+              <button
                 className="profile-pill-btn"
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
               >
