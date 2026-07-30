@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../config';
+import ToastNotification from './ToastNotification';
 
 const AdminUsers = () => {
   const [users, setUsers] = useState([]);
@@ -72,29 +73,15 @@ const AdminUsers = () => {
         setUsers(mapped);
         setTotalEntries(data.total !== undefined ? data.total : mapped.length);
         setTotalPages(data.totalPages !== undefined ? data.totalPages : (Math.ceil((data.total || mapped.length) / limit) || 1));
+      } else {
+        showToast(data.message || 'Network Error', 'error');
       }
     } catch (err) {
-      console.log('Using local storage for created Admin Users');
-      const saved = localStorage.getItem('ukl_created_admin_users');
-      if (saved) {
-        let parsed = JSON.parse(saved);
-        // Apply search filter on local data too
-        if (search && search.trim()) {
-          const q = search.trim().toLowerCase();
-          parsed = parsed.filter(u =>
-            (u.name || '').toLowerCase().includes(q) ||
-            (u.email || '').toLowerCase().includes(q) ||
-            (u.phone || '').toLowerCase().includes(q)
-          );
-        }
-        setUsers(parsed);
-        setTotalEntries(parsed.length);
-        setTotalPages(Math.ceil(parsed.length / limit) || 1);
-      } else {
-        setUsers([]);
-        setTotalEntries(0);
-        setTotalPages(1);
-      }
+      console.error(err);
+      setUsers([]);
+      setTotalEntries(0);
+      setTotalPages(1);
+      showToast('Network Error', 'error');
     } finally {
       setLoading(false);
     }
@@ -264,11 +251,6 @@ const AdminUsers = () => {
       });
       const data = await response.json();
       if (data.success) {
-        setUsers(prev => {
-          const updated = prev.filter(u => u.id !== deletingUserId);
-          localStorage.setItem('ukl_created_admin_users', JSON.stringify(updated));
-          return updated;
-        });
         setDeletingUserId(null);
         fetchUsers();
         showToast(data.message || 'User deleted successfully', 'success');
@@ -276,14 +258,9 @@ const AdminUsers = () => {
         showToast(data.message || 'Failed to delete user', 'error');
       }
     } catch (err) {
-      console.log('Deleted locally');
-      setUsers(prev => {
-        const updated = prev.filter(u => u.id !== deletingUserId);
-        localStorage.setItem('ukl_created_admin_users', JSON.stringify(updated));
-        return updated;
-      });
+      console.error(err);
       setDeletingUserId(null);
-      showToast('User deleted successfully', 'success');
+      showToast('Network Error', 'error');
     }
   };
 
@@ -364,69 +341,18 @@ const AdminUsers = () => {
         showToast(data.message || 'Failed to save user', 'error');
       }
     } catch (err) {
-      console.log('Saved to local state fallback');
+      console.error(err);
+      showToast('Network Error', 'error');
     } finally {
       setLoading(false);
     }
-
-    // Local fallback update & persistence if API is offline
-    if (editingUser) {
-      setUsers(prev => {
-        const updated = prev.map(u => u.id === editingUser.id ? {
-          ...u,
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          pin: formData.pin,
-          status: formData.status,
-          avatar: formData.avatar
-        } : u);
-        localStorage.setItem('ukl_created_admin_users', JSON.stringify(updated));
-        return updated;
-      });
-    } else {
-      const newUser = {
-        id: String(Date.now()),
-        sNo: users.length + 1,
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        pin: formData.pin,
-        status: formData.status,
-        avatar: formData.avatar
-      };
-      setUsers(prev => {
-        const updated = [...prev, newUser];
-        localStorage.setItem('ukl_created_admin_users', JSON.stringify(updated));
-        return updated;
-      });
-    }
-
-    setCurrentView('list');
-    setEditingUser(null);
-    setFormData(defaultFormData);
-    showToast(editingUser ? 'User updated successfully' : 'Admin user created successfully', 'success');
   };
 
   return (
     <div className="admin-module-container">
       
       {/* Floating Toast Notification Popup */}
-      {toast && (
-        <div className="toast-notification-container">
-          <div className={`toast-popup-card ${toast.type}`}>
-            <div className="toast-popup-icon-box">
-              {toast.type === 'success' ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-              ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              )}
-            </div>
-            <span className="toast-popup-text">{toast.message}</span>
-            <button className="toast-popup-close-btn" onClick={() => setToast(null)}>✕</button>
-          </div>
-        </div>
-      )}
+      <ToastNotification toast={toast} onClose={() => setToast(null)} />
 
       {/* Delete Confirmation Modal Popup */}
       {deletingUserId && (

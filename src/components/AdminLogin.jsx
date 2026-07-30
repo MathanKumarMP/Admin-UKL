@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import logo from '../assets/favicon.png';
 import { API_BASE } from '../config';
+import ToastNotification from './ToastNotification';
 
 const AdminLogin = ({ onLoginSuccess }) => {
   const [phone, setPhone] = useState('');
@@ -121,28 +122,14 @@ const AdminLogin = ({ onLoginSuccess }) => {
     } catch (err) {
       console.error('[Login API Error]:', err);
       setIsLoading(false);
-      showToast('Internet Error. Please check your network connection.', 'error');
+      showToast('Network Error', 'error');
     }
   };
 
   return (
     <div className="admin-login-fullscreen">
       {/* Floating Toast Notification Popup */}
-      {toast && (
-        <div className="toast-notification-container">
-          <div className={`toast-popup-card ${toast.type}`}>
-            <div className="toast-popup-icon-box">
-              {toast.type === 'success' ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-              ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              )}
-            </div>
-            <span className="toast-popup-text">{toast.message}</span>
-            <button className="toast-popup-close-btn" onClick={() => setToast(null)}>✕</button>
-          </div>
-        </div>
-      )}
+      <ToastNotification toast={toast} onClose={() => setToast(null)} />
 
       <div className="login-card-box">
         {/* UKL Brand Logo */}

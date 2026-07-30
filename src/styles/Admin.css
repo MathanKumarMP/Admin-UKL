@@ -2970,19 +2970,20 @@ body {
 
 .toast-popup-card {
   pointer-events: auto;
-  min-width: 320px;
+  position: relative;
+  min-width: 330px;
   max-width: 440px;
-  padding: 14px 18px;
+  padding: 16px 18px 20px 18px;
+  background-color: #ffffff;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
-  backdrop-filter: blur(10px);
+  gap: 14px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2e8f0;
   animation: toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-  font-size: 14px;
-  font-weight: 700;
+  overflow: hidden;
 }
 
 @keyframes toastSlideIn {
@@ -2998,20 +2999,18 @@ body {
 }
 
 .toast-popup-card.success {
-  background-color: #f0fdf4;
-  border: 1.5px solid #86efac;
-  color: #15803d;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
 }
 
 .toast-popup-card.error {
-  background-color: #fef2f2;
-  border: 1.5px solid #fca5a5;
-  color: #dc2626;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
 }
 
 .toast-popup-icon-box {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -3020,17 +3019,22 @@ body {
 }
 
 .toast-popup-card.success .toast-popup-icon-box {
-  background-color: #dcfce7;
-  color: #16a34a;
+  background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(22, 163, 74, 0.35);
 }
 
 .toast-popup-card.error .toast-popup-icon-box {
-  background-color: #fee2e2;
-  color: #ef4444;
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(220, 38, 38, 0.35);
 }
 
 .toast-popup-text {
   flex: 1;
+  color: #1b365d;
+  font-size: 15px;
+  font-weight: 600;
   line-height: 1.4;
   word-break: break-word;
 }
@@ -3038,17 +3042,61 @@ body {
 .toast-popup-close-btn {
   background: transparent;
   border: none;
-  color: currentColor;
-  opacity: 0.6;
+  color: #a0aec0;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 18px;
   padding: 2px 6px;
   border-radius: 4px;
-  transition: opacity 0.15s ease;
+  transition: color 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .toast-popup-close-btn:hover {
-  opacity: 1;
+  color: #475569;
+}
+
+/* Progress bar at the bottom of toast card */
+.toast-progress-track {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  overflow: hidden;
+}
+
+.toast-popup-card.error .toast-progress-track {
+  background-color: #fee2e2;
+}
+
+.toast-popup-card.success .toast-progress-track {
+  background-color: #dcfce7;
+}
+
+.toast-progress-fill {
+  height: 100%;
+  width: 100%;
+  animation: toastProgress 3.5s linear forwards;
+}
+
+.toast-popup-card.error .toast-progress-fill {
+  background: linear-gradient(90deg, #b91c1c, #ef4444);
+}
+
+.toast-popup-card.success .toast-progress-fill {
+  background: linear-gradient(90deg, #15803d, #22c55e);
+}
+
+@keyframes toastProgress {
+  0% {
+    width: 100%;
+  }
+
+  100% {
+    width: 0%;
+  }
 }
 
 /* Modal Close Button Styling */

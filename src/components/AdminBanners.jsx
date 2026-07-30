@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE } from '../config';
+import ToastNotification from './ToastNotification';
 
 const AdminBanners = () => {
   const [banners, setBanners] = useState([]);
@@ -77,11 +78,11 @@ const AdminBanners = () => {
         setTotalEntries(data.total !== undefined ? data.total : mapped.length);
         setTotalPages(data.totalPages !== undefined ? data.totalPages : (Math.ceil((data.total || mapped.length) / limit) || 1));
       } else {
-        setErrorMsg(data.message || 'Failed to load banners.');
+        showToast(data.message || 'Network Error', 'error');
       }
     } catch (err) {
       console.error(err);
-      setErrorMsg('Failed to connect to the backend server.');
+      showToast('Network Error', 'error');
     } finally {
       setLoading(false);
     }
@@ -164,7 +165,7 @@ const AdminBanners = () => {
     } catch (err) {
       console.error(err);
       setDeletingBannerId(null);
-      showToast('Internet Error. Please check your network connection.', 'error');
+      showToast('Network Error', 'error');
     }
   };
 
@@ -319,7 +320,7 @@ const AdminBanners = () => {
       }
     } catch (err) {
       console.error(err);
-      showToast('Internet Error. Please check your network connection.', 'error');
+      showToast('Network Error', 'error');
     } finally {
       setLoading(false);
     }
@@ -329,21 +330,7 @@ const AdminBanners = () => {
     <div className="banners-module">
       
       {/* Floating Toast Notification Popup */}
-      {toast && (
-        <div className="toast-notification-container">
-          <div className={`toast-popup-card ${toast.type}`}>
-            <div className="toast-popup-icon-box">
-              {toast.type === 'success' ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-              ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              )}
-            </div>
-            <span className="toast-popup-text">{toast.message}</span>
-            <button className="toast-popup-close-btn" onClick={() => setToast(null)}>✕</button>
-          </div>
-        </div>
-      )}
+      <ToastNotification toast={toast} onClose={() => setToast(null)} />
 
       {/* Header Bar */}
       <div className="banner-list-header-bar">
@@ -359,8 +346,6 @@ const AdminBanners = () => {
           </button>
         )}
       </div>
-
-      {errorMsg && <div className="login-error-alert" style={{ margin: '15px 0' }}>{errorMsg}</div>}
 
       {/* =========================================================================
           VIEW MODE 1: TABLE LIST VIEW

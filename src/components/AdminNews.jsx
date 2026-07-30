@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { API_BASE } from '../config';
+import ToastNotification from './ToastNotification';
 import newsImg1 from '../assets/blog1.JPG';
 import newsImg2 from '../assets/Explore1.png';
 
@@ -118,10 +119,12 @@ const AdminNews = () => {
         setArticles([]);
         setTotalEntries(0);
         setTotalPages(1);
+        showToast(data?.message || 'Network Error', 'error');
       }
     } catch (err) {
       console.error(err);
       setArticles([]);
+      showToast('Network Error', 'error');
     } finally {
       setLoading(false);
     }
@@ -376,7 +379,7 @@ const AdminNews = () => {
       }
     } catch (err) {
       console.error(err);
-      showToast('Internet Error. Please check your network connection.', 'error');
+      showToast('Network Error', 'error');
     } finally {
       setLoading(false);
     }
@@ -482,7 +485,7 @@ const AdminNews = () => {
     } catch (err) {
       console.error(err);
       setDeletingArticleId(null);
-      showToast('Internet Error. Please check your network connection.', 'error');
+      showToast('Network Error', 'error');
     }
   };
 
@@ -517,15 +520,8 @@ const AdminNews = () => {
         showToast(data.message || 'Failed to save tag', 'error');
       }
     } catch (err) {
-      const tagName = tagInput.trim();
-      if (editingTagIndex !== null) {
-        const updated = [...tags];
-        updated[editingTagIndex] = typeof updated[editingTagIndex] === 'object' ? { ...updated[editingTagIndex], name: tagName } : tagName;
-        setTags(updated);
-      } else {
-        setTags(prev => [...prev, { name: tagName }]);
-      }
-      showToast('Tag saved locally', 'success');
+      console.error(err);
+      showToast('Network Error', 'error');
     }
 
     setTagInput('');
@@ -558,13 +554,13 @@ const AdminNews = () => {
       showToast('Tag deleted successfully', 'success');
       fetchTags(tagSearchTerm);
     } catch (err) {
-      setTags(prev => prev.filter((_, idx) => idx !== deletingTagIdx));
-      showToast('Tag deleted successfully', 'success');
+      console.error(err);
+      showToast('Network Error', 'error');
     }
     setDeletingTagIdx(null);
   };
 
-  // CATEGORY MANAGEMENT HANDLERS (Backend API + Local Fallback)
+  // CATEGORY MANAGEMENT HANDLERS (Backend API)
   const handleSaveCategory = async (e) => {
     e.preventDefault();
     if (!categoryInput.trim()) return;
@@ -595,15 +591,8 @@ const AdminNews = () => {
         showToast(data.message || 'Failed to save category', 'error');
       }
     } catch (err) {
-      const catName = categoryInput.trim();
-      if (editingCategoryIndex !== null) {
-        const updated = [...categories];
-        updated[editingCategoryIndex] = typeof updated[editingCategoryIndex] === 'object' ? { ...updated[editingCategoryIndex], name: catName } : catName;
-        setCategories(updated);
-      } else {
-        setCategories(prev => [...prev, { name: catName }]);
-      }
-      showToast('Category saved locally', 'success');
+      console.error(err);
+      showToast('Network Error', 'error');
     }
 
     setCategoryInput('');
@@ -636,8 +625,8 @@ const AdminNews = () => {
       showToast('Category deleted successfully', 'success');
       fetchCategories(categorySearchTerm);
     } catch (err) {
-      setCategories(prev => prev.filter((_, idx) => idx !== deletingCatIdx));
-      showToast('Category deleted successfully', 'success');
+      console.error(err);
+      showToast('Network Error', 'error');
     }
     setDeletingCatIdx(null);
   };
@@ -657,21 +646,7 @@ const AdminNews = () => {
     <div className="blog-post-module">
       
       {/* Floating Toast Notification Popup */}
-      {toast && (
-        <div className="toast-notification-container">
-          <div className={`toast-popup-card ${toast.type}`}>
-            <div className="toast-popup-icon-box">
-              {toast.type === 'success' ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-              ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              )}
-            </div>
-            <span className="toast-popup-text">{toast.message}</span>
-            <button className="toast-popup-close-btn" onClick={() => setToast(null)}>✕</button>
-          </div>
-        </div>
-      )}
+      <ToastNotification toast={toast} onClose={() => setToast(null)} />
 
       {/* Header Bar matching View Mode */}
       {currentView === 'list' && (
@@ -694,8 +669,6 @@ const AdminNews = () => {
           </div>
         </div>
       )}
-
-      {errorMsg && <div className="login-error-alert" style={{ margin: '15px 0' }}>{errorMsg}</div>}
 
       {/* =========================================================================
           VIEW MODE 1: TABLE LIST VIEW
