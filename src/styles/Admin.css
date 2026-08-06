@@ -1152,14 +1152,17 @@ body {
   background: linear-gradient(135deg, #004dad 0%, #4BAD49 100%) !important;
 }
 
-.blog-post-table th {
+.blog-post-table th,
+table th {
   color: #ffffff;
-  font-size: 13px;
+  font-size: 12.5px;
   text-align: center;
   font-weight: 700;
   padding: 12px 14px;
   border-right: 1px solid rgba(255, 255, 255, 0.2);
   white-space: nowrap;
+  text-transform: uppercase !important;
+  letter-spacing: 0.6px;
 }
 
 .blog-post-table th:last-child {
