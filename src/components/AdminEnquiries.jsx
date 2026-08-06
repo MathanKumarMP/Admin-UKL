@@ -335,7 +335,7 @@ const AdminEnquiries = () => {
               {loading && enquiries.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="no-records-cell" style={{ textAlign: 'center' }}>
-                    Loading customer enquiries...
+                    Loading...
                   </td>
                 </tr>
               ) : currentSlice.length === 0 ? (

@@ -615,7 +615,7 @@ const AdminGallery = () => {
                 {loading && galleryItems.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="no-records-cell" style={{ textAlign: 'center' }}>
-                      Loading gallery items...
+                      Loading...
                     </td>
                   </tr>
                 ) : currentSlice.length === 0 ? (

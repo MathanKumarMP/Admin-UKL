@@ -642,7 +642,13 @@ const AdminUsers = () => {
                 </tr>
               </thead>
               <tbody>
-                {currentSlice.length === 0 ? (
+                {loading && users.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="no-records-cell" style={{ textAlign: 'center' }}>
+                      Loading...
+                    </td>
+                  </tr>
+                ) : currentSlice.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="no-records-cell">No matching admin users found</td>
                   </tr>

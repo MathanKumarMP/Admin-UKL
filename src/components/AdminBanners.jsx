@@ -538,7 +538,7 @@ const AdminBanners = () => {
                 {loading && banners.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="no-records-cell" style={{ textAlign: 'center' }}>
-                      Loading banners from server...
+                      Loading...
                     </td>
                   </tr>
                 ) : currentSlice.length === 0 ? (

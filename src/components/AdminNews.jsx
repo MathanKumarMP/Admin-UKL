@@ -886,7 +886,7 @@ const AdminNews = () => {
                 {loading && articles.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="no-records-cell">
-                      Loading news articles from database...
+                      Loading...
                     </td>
                   </tr>
                 ) : currentSlice.length === 0 ? (
