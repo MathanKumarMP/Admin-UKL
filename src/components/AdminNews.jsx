@@ -837,7 +837,6 @@ const AdminNews = () => {
             </div>
 
             <div className="table-search-group">
-              <label>Search:</label>
               <div className="search-input-wrapper">
                 <svg className="search-icon-inside" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="11" cy="11" r="8"></circle>
