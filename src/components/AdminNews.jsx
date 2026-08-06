@@ -61,6 +61,19 @@ const AdminNews = () => {
     status: 'Active',
   };
 
+  const formatDisplayDate = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    try {
+      const cleanStr = String(dateStr).split('T')[0];
+      const parts = cleanStr.split('-');
+      if (parts.length === 3) {
+        const [year, month, day] = parts;
+        return `${day}-${month}-${year}`;
+      }
+    } catch (e) {}
+    return dateStr;
+  };
+
   const [formData, setFormData] = useState(defaultFormData);
   const [formErrors, setFormErrors] = useState({});
   const [toast, setToast] = useState(null);
@@ -999,9 +1012,6 @@ const AdminNews = () => {
             <h3 className="form-title-heading">
               {editingArticle ? 'Edit News Article' : 'Create News Article'}
             </h3>
-            <button className="btn-secondary-dark" onClick={() => { setPersistedView('list'); setEditingArticle(null); }}>
-              ← Back to List
-            </button>
           </div>
 
           <form noValidate onSubmit={handleSubmitArticle} className="modal-form blog-post-full-form">
@@ -1058,51 +1068,12 @@ const AdminNews = () => {
                           'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount', 'emoticons'
                         ],
                         toolbar: 'undo redo | blocks | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | image media link print preview | forecolor backcolor emoticons',
+                        toolbar_mode: 'wrap',
                         content_style: 'body { font-family: "Plus Jakarta Sans", Inter, Helvetica, Arial, sans-serif; font-size: 14px; color: #0f172a; line-height: 1.6; word-break: break-word; overflow-wrap: break-word; word-wrap: break-word; white-space: pre-wrap; max-width: 100%; min-height: 300px; cursor: text; } ul, ol { padding-left: 24px; } p { margin-bottom: 8px; }',
                         branding: false,
                         promotion: false,
                         resize: true,
-                        statusbar: true,
-                        setup: (editor) => {
-                          const dismissTinyMCEPopups = () => {
-                            try {
-                              // 1. Dispatch ESC key inside iframe window & parent window to close floating menus
-                              const escEvent = new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, which: 27, bubbles: true });
-                              if (editor.getWin()) editor.getWin().dispatchEvent(escEvent);
-                              document.dispatchEvent(escEvent);
-                            } catch (e) {}
-
-                            // 2. Toggle active open toolbar button (e.g. More... button)
-                            const container = editor.getContainer();
-                            if (container) {
-                              const activeBtns = container.querySelectorAll('.tox-tbtn[aria-expanded="true"], .tox-tbtn--enabled');
-                              activeBtns.forEach(btn => {
-                                try { btn.click(); } catch (e) {}
-                              });
-                            }
-
-                            // 3. Hide floating overflow drawers and menus from DOM
-                            const popups = document.querySelectorAll('.tox-pop, .tox-toolbar__overflow, .tox-selected-menu, .tox-menu');
-                            popups.forEach(pop => {
-                              pop.style.display = 'none';
-                            });
-                          };
-
-                          editor.on('init', () => {
-                            const doc = editor.getDoc();
-                            const body = editor.getBody();
-                            if (doc) {
-                              doc.addEventListener('mousedown', dismissTinyMCEPopups, true);
-                              doc.addEventListener('click', dismissTinyMCEPopups, true);
-                            }
-                            if (body) {
-                              body.addEventListener('mousedown', dismissTinyMCEPopups, true);
-                              body.addEventListener('click', dismissTinyMCEPopups, true);
-                            }
-                          });
-
-                          editor.on('click mousedown focus ExecCommand NodeChange', dismissTinyMCEPopups);
-                        }
+                        statusbar: true
                       }}
                     />
                   </div>
@@ -1512,11 +1483,6 @@ const AdminNews = () => {
                 Blog Post Details
               </h3>
             </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button type="button" className="btn-secondary-dark" onClick={closeViewArticleModal}>
-                ← Back to List
-              </button>
-            </div>
           </div>
 
           <div className="view-article-full-page-body" style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginTop: '20px' }}>
@@ -1560,7 +1526,7 @@ const AdminNews = () => {
             }}>
               <div>
                 <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Publish Date</span>
-                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginTop: '2px' }}>{viewingArticle.blogDate}</div>
+                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginTop: '2px' }}>{formatDisplayDate(viewingArticle.blogDate)}</div>
               </div>
               <div>
                 <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Category</span>

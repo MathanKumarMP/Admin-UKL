@@ -3243,3 +3243,32 @@ textarea {
 .modal-close-btn:active {
   transform: scale(0.95);
 }
+
+/* Admin Panel Footer Link Hover Color (#60a5fa) */
+.admin-app-footer {
+  background-color: #ffffff;
+  color: #475569;
+  padding: 16px 32px;
+  font-size: 13.5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-top: 1px solid #e2e8f0;
+  margin-top: auto;
+}
+
+.admin-footer-company-link,
+.admin-footer-developer-link {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+  text-decoration: none !important;
+  transition: color 0.2s ease, text-decoration 0.2s ease;
+}
+
+.admin-footer-company-link:hover,
+.admin-footer-developer-link:hover {
+  color: #60a5fa !important;
+  text-decoration: underline !important;
+}

@@ -341,25 +341,13 @@ const AdminLayout = ({ onLogout }) => {
         </div>
       </main>
 
-      {/* Admin Footer Bar with White Background */}
-      <footer style={{
-        backgroundColor: '#ffffff',
-        color: '#475569',
-        padding: '16px 32px',
-        fontSize: '13.5px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '12px',
-        borderTop: '1px solid #e2e8f0',
-        marginTop: 'auto'
-      }}>
+      {/* Admin Footer Bar */}
+      <footer className="admin-app-footer">
         <div>
-          © Copyright 2025 <strong style={{ color: '#0f172a', fontWeight: 700 }}>UKL Instruments</strong>. All rights reserved.
+          © Copyright 2025 <a href="/banners" onClick={(e) => { e.preventDefault(); handleModuleChange('banners'); }} className="admin-footer-company-link">UKL Instruments</a>. All rights reserved.
         </div>
         <div>
-          Designed & Developed by <a href="https://www.oceansoftwares.com/" target="_blank" rel="noopener noreferrer" style={{ color: '#0f172a', fontWeight: 700, textDecoration: 'none' }}>Ocean Softwares Private Limited</a>
+          Designed & Developed by <a href="https://www.oceansoftwares.com/" target="_blank" rel="noopener noreferrer" className="admin-footer-developer-link">Ocean Softwares Private Limited</a>
         </div>
       </footer>
     </div>
