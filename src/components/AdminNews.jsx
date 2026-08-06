@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Editor } from '@tinymce/tinymce-react';
 import { API_BASE } from '../config';
 import ToastNotification from './ToastNotification';
 import newsImg1 from '../assets/blog1.JPG';
@@ -166,6 +167,110 @@ const AdminNews = () => {
     fetchArticles(currentPage, entriesPerPage, searchTerm);
   }, [currentPage, entriesPerPage, searchTerm]);
 
+  const setPersistedView = (view, editId = null) => {
+    setCurrentView(view);
+    const url = new URL(window.location);
+    if (view === 'form') {
+      sessionStorage.setItem('admin_news_view', 'form');
+      url.searchParams.set('view', 'form');
+      if (editId) {
+        sessionStorage.setItem('admin_news_edit_id', editId);
+        url.searchParams.set('editId', editId);
+      } else {
+        sessionStorage.removeItem('admin_news_edit_id');
+        url.searchParams.delete('editId');
+      }
+    } else {
+      sessionStorage.removeItem('admin_news_view');
+      sessionStorage.removeItem('admin_news_edit_id');
+      url.searchParams.delete('view');
+      url.searchParams.delete('editId');
+    }
+    window.history.replaceState({}, '', url.pathname + url.search);
+  };
+
+  const loadEditArticleById = async (articleId) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/news/${articleId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.article) {
+        const fresh = data.article;
+        const thumbnailPath = fresh.thumbnail || '';
+        const mappedArticle = {
+          ...defaultFormData,
+          ...fresh,
+          id: fresh._id || fresh.id,
+          thumbnail: thumbnailPath ? (thumbnailPath.startsWith('http') || thumbnailPath.startsWith('data:') ? thumbnailPath : `${API_BASE}${thumbnailPath.startsWith('/') ? '' : '/'}${thumbnailPath}`) : '',
+          thumbnailFileName: thumbnailPath ? thumbnailPath.split('/').pop() : 'No file chosen'
+        };
+
+        setEditingArticle(mappedArticle);
+        setSelectedFile(null);
+        setFormErrors({});
+        setErrorMsg('');
+        setFormData(mappedArticle);
+        setCurrentView('form');
+      }
+    } catch (err) {
+      console.error('Error loading article for edit on refresh:', err);
+    }
+  };
+
+  const loadViewArticleById = async (articleId) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/news/${articleId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.article) {
+        const fresh = data.article;
+        const thumbnailPath = fresh.thumbnail || '';
+        setViewingArticle({
+          ...fresh,
+          id: fresh._id || fresh.id,
+          thumbnail: thumbnailPath ? (thumbnailPath.startsWith('http') || thumbnailPath.startsWith('data:') ? thumbnailPath : `${API_BASE}${thumbnailPath.startsWith('/') ? '' : '/'}${thumbnailPath}`) : newsImg1
+        });
+        setCurrentView('view');
+      }
+    } catch (err) {
+      console.error('Error loading article for view page on refresh:', err);
+    }
+  };
+
+  const closeViewArticleModal = () => {
+    setViewingArticle(null);
+    setCurrentView('list');
+    sessionStorage.removeItem('admin_news_view_id');
+    sessionStorage.removeItem('admin_news_view');
+    const url = new URL(window.location);
+    url.searchParams.delete('viewId');
+    url.searchParams.delete('view');
+    window.history.replaceState({}, '', url.pathname + url.search);
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const viewParam = params.get('view') || sessionStorage.getItem('admin_news_view');
+    const editIdParam = params.get('editId') || sessionStorage.getItem('admin_news_edit_id');
+    const viewIdParam = params.get('viewId') || sessionStorage.getItem('admin_news_view_id');
+
+    if (viewParam === 'form') {
+      if (editIdParam) {
+        loadEditArticleById(editIdParam);
+      } else {
+        handleOpenAddForm();
+      }
+    } else if (viewParam === 'view' || viewIdParam) {
+      if (viewIdParam) {
+        loadViewArticleById(viewIdParam);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     fetchTags(tagSearchTerm);
   }, [tagSearchTerm]);
@@ -310,6 +415,9 @@ const AdminNews = () => {
     if (!formData.slug || !formData.slug.trim()) {
       errors.slug = 'Slug is required';
     }
+    if (!selectedFile && (!formData.thumbnail || !formData.thumbnail.trim())) {
+      errors.thumbnail = 'Thumbnail image is required';
+    }
     if (!formData.shortDescription || !formData.shortDescription.trim()) {
       errors.shortDescription = 'Short description is required';
     }
@@ -367,7 +475,7 @@ const AdminNews = () => {
       const data = await response.json();
       if (data.success) {
         const successMsg = data.message || (editingArticle ? 'News article updated successfully' : 'News article created successfully');
-        setCurrentView('list');
+        setPersistedView('list');
         setEditingArticle(null);
         setSelectedFile(null);
         setFormData(defaultFormData);
@@ -391,12 +499,13 @@ const AdminNews = () => {
     setEditingArticle(null);
     setFormErrors({});
     setErrorMsg('');
-    setCurrentView('form');
+    setPersistedView('form');
   };
 
   const handleEditArticle = async (article) => {
+    const articleId = article._id || article.id;
+    setPersistedView('form', articleId);
     try {
-      const articleId = article._id || article.id;
       const token = localStorage.getItem('adminToken');
       const res = await fetch(`${API_BASE}/api/admin/news/${articleId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -418,7 +527,6 @@ const AdminNews = () => {
       setFormErrors({});
       setErrorMsg('');
       setFormData(mappedArticle);
-      setCurrentView('form');
     } catch (err) {
       console.error('Error fetching single article details for edit:', err);
       setEditingArticle(article);
@@ -430,13 +538,20 @@ const AdminNews = () => {
         ...article,
         thumbnailFileName: article.thumbnail ? article.thumbnail.split('/').pop() : 'No file chosen'
       });
-      setCurrentView('form');
     }
   };
 
   const handleViewArticle = async (article) => {
+    const articleId = article._id || article.id;
+    sessionStorage.setItem('admin_news_view_id', articleId);
+    sessionStorage.setItem('admin_news_view', 'view');
+    const url = new URL(window.location);
+    url.searchParams.set('view', 'view');
+    url.searchParams.set('viewId', articleId);
+    window.history.replaceState({}, '', url.pathname + url.search);
+    setCurrentView('view');
+
     try {
-      const articleId = article._id || article.id;
       const token = localStorage.getItem('adminToken');
       const res = await fetch(`${API_BASE}/api/admin/news/${articleId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -698,6 +813,7 @@ const AdminNews = () => {
               <input
                 type="text"
                 className="search-input-field"
+                placeholder="Search news..."
                 value={searchTerm}
                 onChange={handleSearchChange}
               />
@@ -850,7 +966,7 @@ const AdminNews = () => {
             <h3 className="form-title-heading">
               {editingArticle ? 'Edit News Article' : 'Create News Article'}
             </h3>
-            <button className="btn-secondary-dark" onClick={() => setCurrentView('list')}>
+            <button className="btn-secondary-dark" onClick={() => { setPersistedView('list'); setEditingArticle(null); }}>
               ← Back to List
             </button>
           </div>
@@ -862,10 +978,7 @@ const AdminNews = () => {
                 
                 {/* Title */}
                 <div className="form-group">
-                  <div className="label-with-error-row">
-                    <label>Title <span className="req-star">*</span></label>
-                    {formErrors.title && <span className="field-error-text">{formErrors.title}</span>}
-                  </div>
+                  <label style={{ marginBottom: '6px', display: 'block' }}>Title <span className="req-star">*</span></label>
                   <input 
                     type="text"
                     placeholder="Enter blog post title"
@@ -873,14 +986,12 @@ const AdminNews = () => {
                     onChange={handleTitleChange}
                     className={formErrors.title ? 'input-field-error' : ''}
                   />
+                  {formErrors.title && <span className="field-error-text">{formErrors.title}</span>}
                 </div>
 
                 {/* Slug */}
                 <div className="form-group">
-                  <div className="label-with-error-row">
-                    <label>Slug <span className="req-star">*</span></label>
-                    {formErrors.slug && <span className="field-error-text">{formErrors.slug}</span>}
-                  </div>
+                  <label style={{ marginBottom: '6px', display: 'block' }}>Slug <span className="req-star">*</span></label>
                   <input 
                     type="text"
                     placeholder="auto-generated-slug-path"
@@ -891,45 +1002,38 @@ const AdminNews = () => {
                     }}
                     className={formErrors.slug ? 'input-field-error' : ''}
                   />
+                  {formErrors.slug && <span className="field-error-text">{formErrors.slug}</span>}
                 </div>
 
-                {/* Word Processor Toolbar for blog details */}
+                {/* TinyMCE Rich Text Editor matching reference screenshot */}
                 <div className="form-group">
-                  <div className="label-with-error-row">
-                    <label>Description / Details <span className="req-star">*</span></label>
-                    {formErrors.blogDetails && <span className="field-error-text">{formErrors.blogDetails}</span>}
+                  <label style={{ marginBottom: '6px', display: 'block' }}>Description / Details <span className="req-star">*</span></label>
+                  <div className={`tinymce-editor-wrapper ${formErrors.blogDetails ? 'input-field-error' : ''}`}>
+                    <Editor
+                      tinymceScriptSrc="https://cdnjs.cloudflare.com/ajax/libs/tinymce/6.8.2/tinymce.min.js"
+                      value={formData.blogDetails}
+                      onEditorChange={(content) => {
+                        setFormData(prev => ({ ...prev, blogDetails: content }));
+                        if (formErrors.blogDetails) setFormErrors(prev => ({ ...prev, blogDetails: '' }));
+                      }}
+                      init={{
+                        height: 380,
+                        menubar: 'file edit insert view format table tools',
+                        plugins: [
+                          'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+                          'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+                          'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount', 'emoticons'
+                        ],
+                        toolbar: 'undo redo | blocks | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | image media link print preview | forecolor backcolor emoticons',
+                        content_style: 'body { font-family: "Plus Jakarta Sans", Inter, Helvetica, Arial, sans-serif; font-size: 14px; color: #0f172a; line-height: 1.6; word-break: break-word; overflow-wrap: break-word; word-wrap: break-word; white-space: pre-wrap; max-width: 100%; } ul, ol { padding-left: 24px; } p { margin-bottom: 8px; }',
+                        branding: false,
+                        promotion: false,
+                        resize: true,
+                        statusbar: true
+                      }}
+                    />
                   </div>
-                  <div className="text-editor-rich-toolbar">
-                    <button type="button" onClick={() => handleExecCommand('bold')} title="Bold"><b>B</b></button>
-                    <button type="button" onClick={() => handleExecCommand('italic')} title="Italic"><i>I</i></button>
-                    <button type="button" onClick={() => handleExecCommand('underline')} title="Underline"><u>U</u></button>
-                    <button type="button" onClick={() => handleExecCommand('justifyLeft')} title="Align Left">←</button>
-                    <button type="button" onClick={() => handleExecCommand('justifyCenter')} title="Align Center">↔</button>
-                    <button type="button" onClick={() => handleExecCommand('justifyRight')} title="Align Right">→</button>
-                    <button type="button" onClick={() => handleExecCommand('insertOrderedList')} title="Numbered List">1.</button>
-                    <button type="button" onClick={() => handleExecCommand('insertUnorderedList')} title="Bullet List">•</button>
-                    <button type="button" onClick={() => {
-                      const link = prompt('Enter URL:');
-                      if (link) handleExecCommand('createLink', link);
-                    }} title="Insert Link">🔗</button>
-                  </div>
-                  
-                  {/* Rich Text Editor Container */}
-                  <div 
-                    ref={editorRef}
-                    className={`content-editable-rich-editor ${formErrors.blogDetails ? 'input-field-error' : ''}`}
-                    contentEditable
-                    placeholder="Write article details here..."
-                    onInput={(e) => {
-                      setFormData({ ...formData, blogDetails: e.currentTarget.innerHTML });
-                      if (formErrors.blogDetails) setFormErrors(prev => ({ ...prev, blogDetails: '' }));
-                    }}
-                    style={{ minHeight: '220px', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '12px', background: '#fff', outline: 'none' }}
-                  ></div>
-                  
-                  <div className="editor-word-count-bar">
-                    Word Count: {calculateWordCount(formData.blogDetails)} words
-                  </div>
+                  {formErrors.blogDetails && <span className="field-error-text">{formErrors.blogDetails}</span>}
                 </div>
 
                 {/* Meta Settings (Seo Optimization fields) */}
@@ -974,10 +1078,7 @@ const AdminNews = () => {
                 
                 {/* Thumbnail upload box */}
                 <div className="form-group">
-                  <div className="label-with-error-row">
-                    <label>Thumbnail Image <span className="req-star">*</span></label>
-                    {formErrors.thumbnail && <span className="field-error-text">{formErrors.thumbnail}</span>}
-                  </div>
+                  <label style={{ marginBottom: '6px', display: 'block' }}>Thumbnail Image <span className="req-star">*</span></label>
                   <div className={`thumbnail-upload-dropzone ${formErrors.thumbnail ? 'input-field-error' : ''}`}>
                     <div className="dropzone-media-preview-container">
                       {formData.thumbnail ? (
@@ -1007,14 +1108,12 @@ const AdminNews = () => {
                       <span className="file-name-indicator-span">{formData.thumbnailFileName}</span>
                     </div>
                   </div>
+                  {formErrors.thumbnail && <span className="field-error-text">{formErrors.thumbnail}</span>}
                 </div>
 
                 {/* Short Description */}
                 <div className="form-group">
-                  <div className="label-with-error-row">
-                    <label>Short Summary / Hook <span className="req-star">*</span></label>
-                    {formErrors.shortDescription && <span className="field-error-text">{formErrors.shortDescription}</span>}
-                  </div>
+                  <label style={{ marginBottom: '6px', display: 'block' }}>Short Summary / Hook <span className="req-star">*</span></label>
                   <textarea 
                     placeholder="Short description displayed on card"
                     rows="3"
@@ -1025,6 +1124,7 @@ const AdminNews = () => {
                     }}
                     className={formErrors.shortDescription ? 'input-field-error' : ''}
                   ></textarea>
+                  {formErrors.shortDescription && <span className="field-error-text">{formErrors.shortDescription}</span>}
                 </div>
 
                 {/* Date & Author */}
@@ -1126,7 +1226,7 @@ const AdminNews = () => {
 
             {/* Save / Cancel buttons bar */}
             <div className="modal-actions form-actions-sticky-bar">
-              <button type="button" className="btn-cancel-outline" onClick={() => setCurrentView('list')} disabled={loading}>
+              <button type="button" className="btn-cancel-outline" onClick={() => { setPersistedView('list'); setEditingArticle(null); }} disabled={loading}>
                 Cancel
               </button>
               <button type="submit" className="btn-save-banner-filled" disabled={loading}>
@@ -1326,89 +1426,130 @@ const AdminNews = () => {
       )}
 
       {/* =========================================================================
-          VIEW ARTICLE DETAILS POPUP MODAL
+          VIEW MODE 5: FULL INLINE PAGE - VIEW BLOG POST DETAILS
          ========================================================================= */}
-      {viewingArticle && (
-        <div className="admin-modal-overlay">
-          <div className="admin-modal" style={{ maxWidth: '640px' }}>
-            <div className="modal-header">
-              <h3>Blog Post Details</h3>
-              <button className="collapse-btn" onClick={() => setViewingArticle(null)}>✕</button>
+      {currentView === 'view' && viewingArticle && (
+        <div className="blog-post-card-container inline-form-container">
+          {/* Header Bar with Action Buttons */}
+          <div className="inline-form-header">
+            <div>
+              <h3 className="form-title-heading" style={{ marginBottom: '4px' }}>
+                Blog Post Details
+              </h3>
             </div>
-
-            <div className="slideshow-giant-window" style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', height: '240px', marginBottom: '16px' }}>
-              <img 
-                src={viewingArticle.thumbnail} 
-                alt={viewingArticle.title} 
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = newsImg1;
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '13.5px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Publish Date:</span>
-                  <div style={{ fontWeight: 700, color: '#0f172a' }}>{viewingArticle.blogDate}</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Category:</span>
-                  <div style={{ fontWeight: 700, color: '#004dad' }}>{viewingArticle.category}</div>
-                </div>
-              </div>
-
-              <div>
-                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Title:</span>
-                <h4 style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', margin: '2px 0 0 0' }}>{viewingArticle.title}</h4>
-              </div>
-
-              <div>
-                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Short Description:</span>
-                <p style={{ color: '#475569', lineHeight: 1.5, margin: '2px 0 0 0' }}>{viewingArticle.shortDescription}</p>
-              </div>
-
-              <div>
-                <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>HTML Content preview:</span>
-                <div 
-                  style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#334155', height: '150px', overflowY: 'auto', lineHeight: '1.6', margin: '2px 0 0 0' }}
-                  dangerouslySetInnerHTML={{ __html: viewingArticle.blogDetails }}
-                ></div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Author:</span>
-                  <div style={{ fontWeight: 700 }}>{viewingArticle.author}</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Publish Status:</span>
-                  <div style={{ marginTop: '2px' }}>
-                    <span className={`status-pill ${viewingArticle.status === 'Active' ? 'published' : 'inactive'}`}>
-                      {viewingArticle.status === 'Active' ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-actions" style={{ paddingTop: '16px', borderTop: '1px solid #f1f5f9', marginTop: '16px' }}>
-              <button type="button" className="btn-secondary-dark" onClick={() => setViewingArticle(null)}>
-                Close
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="button" className="btn-secondary-dark" onClick={closeViewArticleModal}>
+                ← Back to List
               </button>
-              {/* <button 
-                type="button" 
-                className="btn-save-banner-filled"
-                onClick={() => {
-                  handleEdit(viewingArticle);
-                  setViewingArticle(null);
-                }}
-              >
-                Edit Post
-              </button> */}
             </div>
+          </div>
+
+          <div className="view-article-full-page-body" style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginTop: '20px' }}>
+            
+            {/* Top Showcase Banner Image */}
+            {viewingArticle.thumbnail && (
+              <div style={{
+                width: '100%',
+                maxHeight: '340px',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '8px',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+              }}>
+                <img 
+                  src={viewingArticle.thumbnail} 
+                  alt={viewingArticle.title} 
+                  style={{ width: '100%', maxHeight: '320px', objectFit: 'contain' }}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = newsImg1;
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Article Metadata Grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '16px',
+              padding: '16px 20px',
+              background: '#f8fafc',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0'
+            }}>
+              <div>
+                <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Publish Date</span>
+                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginTop: '2px' }}>{viewingArticle.blogDate}</div>
+              </div>
+              <div>
+                <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Category</span>
+                <div style={{ fontWeight: 700, color: '#004dad', fontSize: '14px', marginTop: '2px' }}>{viewingArticle.category || 'Company News'}</div>
+              </div>
+              <div>
+                <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Author Name</span>
+                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px', marginTop: '2px' }}>{viewingArticle.author || 'UKL Team'}</div>
+              </div>
+              <div>
+                <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Publish Status</span>
+                <div style={{ marginTop: '4px' }}>
+                  <span className={`status-pill ${viewingArticle.status === 'Active' ? 'published' : 'inactive'}`}>
+                    {viewingArticle.status === 'Active' ? 'Active / Published' : 'Inactive / Draft'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Article Title */}
+            <div>
+              <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Article Title</span>
+              <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: '4px 0 0 0', lineHeight: 1.3 }}>{viewingArticle.title}</h2>
+            </div>
+
+            {/* Short Description */}
+            {viewingArticle.shortDescription && (
+              <div style={{ padding: '16px 20px', background: '#f1f5f9', borderRadius: '10px', borderLeft: '4px solid #004dad' }}>
+                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '4px' }}>Short Summary</span>
+                <p style={{ color: '#334155', fontSize: '14px', lineHeight: 1.6, margin: 0, fontWeight: 500 }}>{viewingArticle.shortDescription}</p>
+              </div>
+            )}
+
+            {/* Full HTML Content Preview Box */}
+            <div>
+              <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>Full Article HTML Content Preview</span>
+              <div 
+                className="view-article-full-page-body"
+                style={{
+                  background: '#ffffff',
+                  padding: '24px',
+                  borderRadius: '12px',
+                  border: '1px solid #cbd5e1',
+                  color: '#1e293b',
+                  minHeight: '260px',
+                  lineHeight: '1.7',
+                  fontSize: '14.5px',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word',
+                  wordWrap: 'break-word',
+                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.03)'
+                }}
+                dangerouslySetInnerHTML={{ __html: viewingArticle.blogDetails }}
+              ></div>
+            </div>
+
+            {/* Bottom Actions Bar */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', paddingTop: '20px', borderTop: '1px solid #e2e8f0', marginTop: '12px' }}>
+              <button type="button" className="btn-secondary-dark" onClick={closeViewArticleModal}>
+                ← Back to List
+              </button>
+              
+            </div>
+
           </div>
         </div>
       )}

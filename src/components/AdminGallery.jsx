@@ -102,6 +102,117 @@ const AdminGallery = () => {
     }
   };
 
+  const setPersistedView = (view, editId = null) => {
+    setCurrentView(view);
+    const url = new URL(window.location);
+    if (view === 'form') {
+      sessionStorage.setItem('admin_gallery_view', 'form');
+      url.searchParams.set('view', 'form');
+      if (editId) {
+        sessionStorage.setItem('admin_gallery_edit_id', editId);
+        url.searchParams.set('editId', editId);
+      } else {
+        sessionStorage.removeItem('admin_gallery_edit_id');
+        url.searchParams.delete('editId');
+      }
+    } else {
+      sessionStorage.removeItem('admin_gallery_view');
+      sessionStorage.removeItem('admin_gallery_edit_id');
+      url.searchParams.delete('view');
+      url.searchParams.delete('editId');
+    }
+    window.history.replaceState({}, '', url.pathname + url.search);
+  };
+
+  const loadEditItemById = async (itemId) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/gallery/${itemId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.item) {
+        const fresh = data.item;
+        const mediaUrls = (fresh.mediaUrls || []).map(url =>
+          url.startsWith('http') || url.startsWith('data:') ? url : `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`
+        );
+
+        setEditingItem({
+          ...fresh,
+          id: fresh._id || fresh.id
+        });
+        setSelectedFiles([]);
+        setFormErrors({});
+        setErrorMsg('');
+        setFormData({
+          title: fresh.title || '',
+          mediaType: fresh.type === 'video' ? 'Video' : 'Image',
+          status: fresh.status || 'Active',
+          category: fresh.category || 'General',
+          mediaList: mediaUrls,
+          mediaUrl: mediaUrls[0] || '',
+          fileName: `${mediaUrls.length} file(s) currently stored`
+        });
+        setCurrentView('form');
+      }
+    } catch (err) {
+      console.error('Error loading gallery item on refresh:', err);
+    }
+  };
+
+  const loadViewItemById = async (itemId) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/gallery/${itemId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.item) {
+        const fresh = data.item;
+        const mediaUrls = (fresh.mediaUrls || []).map(url =>
+          url.startsWith('http') || url.startsWith('data:') ? url : `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`
+        );
+        const mappedItem = {
+          ...fresh,
+          id: fresh._id || fresh.id,
+          mediaType: fresh.type === 'video' ? 'Video' : 'Image',
+          mediaList: mediaUrls,
+          mediaUrl: mediaUrls[0] || ''
+        };
+        setViewingItem(mappedItem);
+        setSelectedModalMedia(mappedItem.mediaUrl);
+      }
+    } catch (err) {
+      console.error('Error loading gallery view item on refresh:', err);
+    }
+  };
+
+  const closeViewModal = () => {
+    setViewingItem(null);
+    setSelectedModalMedia('');
+    sessionStorage.removeItem('admin_gallery_view_id');
+    const url = new URL(window.location);
+    url.searchParams.delete('viewId');
+    window.history.replaceState({}, '', url.pathname + url.search);
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const viewParam = params.get('view') || sessionStorage.getItem('admin_gallery_view');
+    const editIdParam = params.get('editId') || sessionStorage.getItem('admin_gallery_edit_id');
+    const viewIdParam = params.get('viewId') || sessionStorage.getItem('admin_gallery_view_id');
+
+    if (viewParam === 'form') {
+      if (editIdParam) {
+        loadEditItemById(editIdParam);
+      } else {
+        handleOpenAddForm();
+      }
+    } else if (viewIdParam) {
+      loadViewItemById(viewIdParam);
+    }
+  }, []);
+
   useEffect(() => {
     fetchGallery(currentPage, entriesPerPage, searchTerm);
   }, [currentPage, entriesPerPage, searchTerm]);
@@ -225,12 +336,13 @@ const AdminGallery = () => {
     setEditingItem(null);
     setFormErrors({});
     setErrorMsg('');
-    setCurrentView('form');
+    setPersistedView('form');
   };
 
   const handleEdit = async (item) => {
     try {
       const itemId = item._id || item.id;
+      setPersistedView('form', itemId);
       const token = localStorage.getItem('adminToken');
       const res = await fetch(`${API_BASE}/api/admin/gallery/${itemId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -251,16 +363,17 @@ const AdminGallery = () => {
       setErrorMsg('');
       setFormData({
         title: fresh.title || '',
-        mediaType: fresh.type || 'image',
+        mediaType: fresh.type === 'video' ? 'Video' : 'Image',
         status: fresh.status || 'Active',
         category: fresh.category || 'General',
         mediaList: mediaUrls,
         mediaUrl: mediaUrls[0] || '',
         fileName: `${mediaUrls.length} file(s) currently stored`
       });
-      setCurrentView('form');
     } catch (err) {
       console.error('Error fetching single gallery item for edit:', err);
+      const itemId = item._id || item.id;
+      setPersistedView('form', itemId);
       setEditingItem(item);
       setSelectedFiles([]);
       setFormErrors({});
@@ -274,13 +387,17 @@ const AdminGallery = () => {
         mediaUrl: item.mediaUrl || '',
         fileName: `${item.mediaList ? item.mediaList.length : 0} file(s) currently stored`
       });
-      setCurrentView('form');
     }
   };
 
   const handleViewGalleryItem = async (item) => {
+    const itemId = item._id || item.id;
+    sessionStorage.setItem('admin_gallery_view_id', itemId);
+    const url = new URL(window.location);
+    url.searchParams.set('viewId', itemId);
+    window.history.replaceState({}, '', url.pathname + url.search);
+
     try {
-      const itemId = item._id || item.id;
       const token = localStorage.getItem('adminToken');
       const res = await fetch(`${API_BASE}/api/admin/gallery/${itemId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -294,7 +411,7 @@ const AdminGallery = () => {
         const mappedItem = {
           ...fresh,
           id: fresh._id || fresh.id,
-          mediaType: fresh.type || 'image',
+          mediaType: fresh.type === 'video' ? 'Video' : 'Image',
           mediaList: mediaUrls,
           mediaUrl: mediaUrls[0] || ''
         };
@@ -371,7 +488,7 @@ const AdminGallery = () => {
 
       if (data.success) {
         const successMsg = data.message || (editingItem ? 'Gallery item updated successfully' : 'Gallery item uploaded successfully');
-        setCurrentView('list');
+        setPersistedView('list');
         setEditingItem(null);
         setFormData(defaultFormData);
         setSelectedFiles([]);
@@ -406,7 +523,7 @@ const AdminGallery = () => {
             <span className="plus-icon" style={{ marginRight: '6px' }}>+</span> Add Gallery Item
           </button>
         ) : (
-          <button className="btn-secondary-dark" onClick={() => setCurrentView('list')}>
+          <button className="btn-secondary-dark" onClick={() => { setPersistedView('list'); setEditingItem(null); }}>
             ← Back to Gallery List
           </button>
         )}
@@ -669,10 +786,7 @@ const AdminGallery = () => {
             {/* Row 1 (2 Columns): Title & Media Type */}
             <div className="form-row-2col">
               <div className="form-group">
-                <div className="label-with-error-row">
-                  <label>Gallery Title / Project Name <span className="req-star">*</span></label>
-                  {formErrors.title && <span className="field-error-text">{formErrors.title}</span>}
-                </div>
+                <label style={{ marginBottom: '6px', display: 'block' }}>Gallery Title / Project Name <span className="req-star">*</span></label>
                 <input 
                   type="text"
                   placeholder="Enter title"
@@ -685,6 +799,7 @@ const AdminGallery = () => {
                   }}
                   className={formErrors.title ? 'input-field-error' : ''}
                 />
+                {formErrors.title && <span className="field-error-text">{formErrors.title}</span>}
               </div>
 
               <div className="form-group">
@@ -702,10 +817,7 @@ const AdminGallery = () => {
             {/* Row 2 (2 Columns): Select Files to Upload & Status */}
             <div className="form-row-2col">
               <div className="form-group">
-                <div className="label-with-error-row">
-                  <label>Select Images/Videos to Upload <span className="req-star">*</span></label>
-                  {formErrors.files && <span className="field-error-text">{formErrors.files}</span>}
-                </div>
+                <label style={{ marginBottom: '6px', display: 'block' }}>Select Images/Videos to Upload <span className="req-star">*</span></label>
                 <div className={`custom-file-upload-box ${formErrors.files ? 'input-field-error' : ''}`}>
                   <input
                     type="file"
@@ -725,6 +837,7 @@ const AdminGallery = () => {
                   </label>
                   <span className="file-name-label">{formData.fileName}</span>
                 </div>
+                {formErrors.files && <span className="field-error-text">{formErrors.files}</span>}
               </div>
 
               <div className="form-group">
@@ -796,7 +909,8 @@ const AdminGallery = () => {
                 onClick={() => {
                   setFormErrors({});
                   setErrorMsg('');
-                  setCurrentView('list');
+                  setPersistedView('list');
+                  setEditingItem(null);
                 }} 
                 disabled={loading}
               >
@@ -819,7 +933,7 @@ const AdminGallery = () => {
           <div className="admin-modal" style={{ maxWidth: '680px' }}>
             <div className="modal-header">
               <h3>Gallery Media Slideshow</h3>
-              <button className="collapse-btn" onClick={() => setViewingItem(null)}>✕</button>
+              <button className="collapse-btn" onClick={closeViewModal}>✕</button>
             </div>
 
             <div className="gallery-details-slideshow-box" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -898,7 +1012,7 @@ const AdminGallery = () => {
               </div>
 
               <div className="modal-actions" style={{ paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
-                <button type="button" className="btn-secondary-dark" onClick={() => setViewingItem(null)}>
+                <button type="button" className="btn-secondary-dark" onClick={closeViewModal}>
                   Close
                 </button>
                 {/*  */}

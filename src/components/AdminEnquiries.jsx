@@ -76,6 +76,42 @@ const AdminEnquiries = () => {
     fetchEnquiries(currentPage, entriesPerPage, searchTerm);
   }, [currentPage, entriesPerPage, searchTerm]);
 
+  const loadViewEnquiryById = async (enquiryId) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/enquiries/${enquiryId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.enquiry) {
+        const fresh = data.enquiry;
+        setViewingEnquiry({
+          ...fresh,
+          id: fresh._id || fresh.id,
+          date: fresh.createdAt ? new Date(fresh.createdAt).toLocaleString('en-IN') : ''
+        });
+      }
+    } catch (err) {
+      console.error('Error loading enquiry for view modal on refresh:', err);
+    }
+  };
+
+  const closeViewEnquiryModal = () => {
+    setViewingEnquiry(null);
+    sessionStorage.removeItem('admin_enquiries_view_id');
+    const url = new URL(window.location);
+    url.searchParams.delete('viewId');
+    window.history.replaceState({}, '', url.pathname + url.search);
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const viewIdParam = params.get('viewId') || sessionStorage.getItem('admin_enquiries_view_id');
+    if (viewIdParam) {
+      loadViewEnquiryById(viewIdParam);
+    }
+  }, []);
+
   // Server-Side Pagination Calculations
   const startIndex = totalEntries > 0 ? (currentPage - 1) * entriesPerPage + 1 : 0;
   const endIndex = Math.min(currentPage * entriesPerPage, totalEntries);
@@ -125,8 +161,13 @@ const AdminEnquiries = () => {
   };
 
   const handleViewEnquiry = async (item) => {
+    const enquiryId = item._id || item.id;
+    sessionStorage.setItem('admin_enquiries_view_id', enquiryId);
+    const url = new URL(window.location);
+    url.searchParams.set('viewId', enquiryId);
+    window.history.replaceState({}, '', url.pathname + url.search);
+
     try {
-      const enquiryId = item._id || item.id;
       const token = localStorage.getItem('adminToken');
       const res = await fetch(`${API_BASE}/api/admin/enquiries/${enquiryId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -253,6 +294,7 @@ const AdminEnquiries = () => {
             <input
               type="text"
               className="search-input-field"
+              placeholder="Search enquiry..."
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             />
@@ -376,7 +418,7 @@ const AdminEnquiries = () => {
                 Customer Enquiry Details
               </h3>
               <button 
-                onClick={() => setViewingEnquiry(null)}
+                onClick={closeViewEnquiryModal}
                 style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#64748b' }}
               >
                 ✕
@@ -414,10 +456,11 @@ const AdminEnquiries = () => {
               </div>
             </div>
 
-            <div style={{ marginTop: '20px', textAlign: 'right' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
               <button 
-                className="btn-dark-navy-back" 
-                onClick={() => setViewingEnquiry(null)}
+                type="button"
+                className="btn-secondary-dark"
+                onClick={closeViewEnquiryModal}
                 style={{ padding: '8px 22px', borderRadius: '6px', cursor: 'pointer' }}
               >
                 Close

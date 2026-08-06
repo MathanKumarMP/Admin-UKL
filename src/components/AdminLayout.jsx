@@ -44,11 +44,19 @@ const AdminLayout = ({ onLogout }) => {
   }, []);
 
   const handleModuleChange = (moduleId) => {
-    setActiveModule(moduleId);
+    // Clear persisted view & edit states across all modules when navigating via top navbar tabs
+    const viewKeys = [
+      'admin_banners_view', 'admin_banners_edit_id', 'admin_banners_view_id',
+      'admin_gallery_view', 'admin_gallery_edit_id', 'admin_gallery_view_id',
+      'admin_news_view', 'admin_news_edit_id', 'admin_news_view_id',
+      'admin_users_view', 'admin_users_edit_id', 'admin_users_view_id',
+      'admin_enquiries_view', 'admin_enquiries_edit_id', 'admin_enquiries_view_id'
+    ];
+    viewKeys.forEach(k => sessionStorage.removeItem(k));
+
     const newPath = moduleId === 'banners' ? '/banners' : `/${moduleId}`;
-    if (window.location.pathname !== newPath) {
-      window.history.pushState(null, '', newPath);
-    }
+    window.history.pushState(null, '', newPath);
+    setActiveModule(moduleId);
   };
 
   const [currentUser, setCurrentUser] = useState(() => {
@@ -179,18 +187,18 @@ const AdminLayout = ({ onLogout }) => {
   const renderModuleContent = () => {
     switch (activeModule) {
       case 'gallery':
-        return <AdminGallery />;
+        return <AdminGallery key="gallery" />;
       case 'news':
-        return <AdminNews />;
+        return <AdminNews key="news" />;
       case 'enquiries':
-        return <AdminEnquiries />;
+        return <AdminEnquiries key="enquiries" />;
       case 'users':
-        return <AdminUsers />;
+        return <AdminUsers key="users" />;
       case 'banners':
-        return <AdminBanners />;
+        return <AdminBanners key="banners" />;
       case 'notFound':
       default:
-        return <AdminNotFound onNavigate={handleModuleChange} />;
+        return <AdminNotFound onNavigate={handleModuleChange} key="notFound" />;
     }
   };
 
@@ -332,6 +340,28 @@ const AdminLayout = ({ onLogout }) => {
           {renderModuleContent()}
         </div>
       </main>
+
+      {/* Admin Footer Bar with White Background */}
+      <footer style={{
+        backgroundColor: '#ffffff',
+        color: '#475569',
+        padding: '16px 32px',
+        fontSize: '13.5px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '12px',
+        borderTop: '1px solid #e2e8f0',
+        marginTop: 'auto'
+      }}>
+        <div>
+          © Copyright 2025 <strong style={{ color: '#0f172a', fontWeight: 700 }}>UKL Instruments</strong>. All rights reserved.
+        </div>
+        <div>
+          Designed & Developed by <a href="https://www.oceansoftwares.com/" target="_blank" rel="noopener noreferrer" style={{ color: '#0f172a', fontWeight: 700, textDecoration: 'none' }}>Ocean Softwares Private Limited</a>
+        </div>
+      </footer>
     </div>
   );
 };

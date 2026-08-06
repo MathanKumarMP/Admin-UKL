@@ -92,6 +92,107 @@ const AdminBanners = () => {
     fetchBanners(currentPage, entriesPerPage, searchTerm);
   }, [currentPage, entriesPerPage, searchTerm]);
 
+  const setPersistedView = (view, editId = null) => {
+    setCurrentView(view);
+    const url = new URL(window.location);
+    if (view === 'form') {
+      sessionStorage.setItem('admin_banners_view', 'form');
+      url.searchParams.set('view', 'form');
+      if (editId) {
+        sessionStorage.setItem('admin_banners_edit_id', editId);
+        url.searchParams.set('editId', editId);
+      } else {
+        sessionStorage.removeItem('admin_banners_edit_id');
+        url.searchParams.delete('editId');
+      }
+    } else {
+      sessionStorage.removeItem('admin_banners_view');
+      sessionStorage.removeItem('admin_banners_edit_id');
+      url.searchParams.delete('view');
+      url.searchParams.delete('editId');
+    }
+    window.history.replaceState({}, '', url.pathname + url.search);
+  };
+
+  const loadEditBannerById = async (bannerId) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/banners/${bannerId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.banner) {
+        const fresh = data.banner;
+        const imgPath = fresh.image || fresh.img || '';
+        setEditingBanner({
+          ...fresh,
+          id: fresh._id || fresh.id
+        });
+        setSelectedFile(null);
+        setFormErrors({});
+        setErrorMsg('');
+        setFormData({
+          title: fresh.title || '',
+          pageName: fresh.pageName || 'Home Page',
+          linkUrl: fresh.linkUrl || '',
+          status: fresh.status || 'Active',
+          description: fresh.description || '',
+          img: imgPath ? (imgPath.startsWith('http') || imgPath.startsWith('data:') ? imgPath : `${API_BASE}${imgPath.startsWith('/') ? '' : '/'}${imgPath}`) : '',
+          fileName: imgPath ? imgPath.split('/').pop() : 'banner_image.png'
+        });
+        setCurrentView('form');
+      }
+    } catch (err) {
+      console.error('Error loading banner for edit on refresh:', err);
+    }
+  };
+
+  const loadViewBannerById = async (bannerId) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/banners/${bannerId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.banner) {
+        const fresh = data.banner;
+        const imgPath = fresh.image || fresh.img || '';
+        setViewingBanner({
+          ...fresh,
+          id: fresh._id || fresh.id,
+          img: imgPath ? (imgPath.startsWith('http') || imgPath.startsWith('data:') ? imgPath : `${API_BASE}${imgPath.startsWith('/') ? '' : '/'}${imgPath}`) : ''
+        });
+      }
+    } catch (err) {
+      console.error('Error loading banner for view modal on refresh:', err);
+    }
+  };
+
+  const closeViewBannerModal = () => {
+    setViewingBanner(null);
+    sessionStorage.removeItem('admin_banners_view_id');
+    const url = new URL(window.location);
+    url.searchParams.delete('viewId');
+    window.history.replaceState({}, '', url.pathname + url.search);
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const viewParam = params.get('view') || sessionStorage.getItem('admin_banners_view');
+    const editIdParam = params.get('editId') || sessionStorage.getItem('admin_banners_edit_id');
+    const viewIdParam = params.get('viewId') || sessionStorage.getItem('admin_banners_view_id');
+
+    if (viewParam === 'form') {
+      if (editIdParam) {
+        loadEditBannerById(editIdParam);
+      } else {
+        handleOpenAddForm();
+      }
+    } else if (viewIdParam) {
+      loadViewBannerById(viewIdParam);
+    }
+  }, []);
+
   // Handle File Input Change
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -175,12 +276,13 @@ const AdminBanners = () => {
     setEditingBanner(null);
     setFormErrors({});
     setErrorMsg('');
-    setCurrentView('form');
+    setPersistedView('form');
   };
 
   const handleEdit = async (item) => {
+    const bannerId = item._id || item.id;
+    setPersistedView('form', bannerId);
     try {
-      const bannerId = item._id || item.id;
       const token = localStorage.getItem('adminToken');
       const res = await fetch(`${API_BASE}/api/admin/banners/${bannerId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -205,7 +307,6 @@ const AdminBanners = () => {
         img: imgPath ? (imgPath.startsWith('http') || imgPath.startsWith('data:') ? imgPath : `${API_BASE}${imgPath.startsWith('/') ? '' : '/'}${imgPath}`) : '',
         fileName: imgPath ? imgPath.split('/').pop() : 'banner_image.png'
       });
-      setCurrentView('form');
     } catch (err) {
       console.error('Error fetching single banner details for edit:', err);
       setEditingBanner(item);
@@ -221,13 +322,17 @@ const AdminBanners = () => {
         img: item.img,
         fileName: item.fileName || 'banner_image.png'
       });
-      setCurrentView('form');
     }
   };
 
   const handleViewBanner = async (item) => {
+    const bannerId = item._id || item.id;
+    sessionStorage.setItem('admin_banners_view_id', bannerId);
+    const url = new URL(window.location);
+    url.searchParams.set('viewId', bannerId);
+    window.history.replaceState({}, '', url.pathname + url.search);
+
     try {
-      const bannerId = item._id || item.id;
       const token = localStorage.getItem('adminToken');
       const res = await fetch(`${API_BASE}/api/admin/banners/${bannerId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -308,7 +413,7 @@ const AdminBanners = () => {
 
       if (data.success) {
         const successMsg = data.message || (editingBanner ? 'Banner updated successfully' : 'Banner created successfully');
-        setCurrentView('list');
+        setPersistedView('list');
         setEditingBanner(null);
         setFormData(defaultFormData);
         setSelectedFile(null);
@@ -375,6 +480,7 @@ const AdminBanners = () => {
               <input
                 type="text"
                 className="search-input-field"
+                placeholder="Search banner..."
                 value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               />
@@ -527,10 +633,7 @@ const AdminBanners = () => {
             {/* Row 1: Banner Title * & Status * */}
             <div className="form-row-2col">
               <div className="form-group">
-                <div className="label-with-error-row">
-                  <label>Banner Title <span className="req-star">*</span></label>
-                  {formErrors.title && <span className="field-error-text">{formErrors.title}</span>}
-                </div>
+                <label style={{ marginBottom: '6px', display: 'block' }}>Banner Title <span className="req-star">*</span></label>
                 <input
                   type="text"
                   placeholder="Enter title"
@@ -543,6 +646,7 @@ const AdminBanners = () => {
                   }}
                   className={formErrors.title ? 'input-field-error' : ''}
                 />
+                {formErrors.title && <span className="field-error-text">{formErrors.title}</span>}
               </div>
 
               <div className="form-group">
@@ -559,10 +663,7 @@ const AdminBanners = () => {
 
             {/* Row 2: Banner Image */}
             <div className="form-group">
-              <div className="label-with-error-row">
-                <label>Banner Image <span className="req-star">*</span></label>
-                {formErrors.image && <span className="field-error-text">{formErrors.image}</span>}
-              </div>
+              <label style={{ marginBottom: '6px', display: 'block' }}>Banner Image <span className="req-star">*</span></label>
               <div className={`custom-file-upload-box ${formErrors.image ? 'input-field-error' : ''}`}>
                 <input
                   type="file"
@@ -579,6 +680,7 @@ const AdminBanners = () => {
                   <img src={formData.img} alt="Banner Preview" className="file-thumb-preview" />
                 )}
               </div>
+              {formErrors.image && <span className="field-error-text">{formErrors.image}</span>}
             </div>
 
             
@@ -591,7 +693,8 @@ const AdminBanners = () => {
                 onClick={() => {
                   setFormErrors({});
                   setErrorMsg('');
-                  setCurrentView('list');
+                  setPersistedView('list');
+                  setEditingBanner(null);
                 }} 
                 disabled={loading}
               >
@@ -614,7 +717,7 @@ const AdminBanners = () => {
           <div className="admin-modal" style={{ maxWidth: '580px' }}>
             <div className="modal-header">
               <h3>Banner Details</h3>
-              <button className="collapse-btn" onClick={() => setViewingBanner(null)}>✕</button>
+              <button className="collapse-btn" onClick={closeViewBannerModal}>✕</button>
             </div>
 
             <div className="banner-details-view-box" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -672,7 +775,7 @@ const AdminBanners = () => {
               )}
 
               <div className="modal-actions" style={{ marginTop: '8px', paddingTop: '16px', borderTop: '1px solid #f1f5f9' }}>
-                <button type="button" className="btn-secondary-dark" onClick={() => setViewingBanner(null)}>
+                <button type="button" className="btn-secondary-dark" onClick={closeViewBannerModal}>
                   Close
                 </button>  
               </div>

@@ -91,6 +91,107 @@ const AdminUsers = () => {
     fetchUsers(currentPage, entriesPerPage, searchTerm);
   }, [currentPage, entriesPerPage, searchTerm]);
 
+  const setPersistedView = (view, editId = null) => {
+    setCurrentView(view);
+    const url = new URL(window.location);
+    if (view === 'form') {
+      sessionStorage.setItem('admin_users_view', 'form');
+      url.searchParams.set('view', 'form');
+      if (editId) {
+        sessionStorage.setItem('admin_users_edit_id', editId);
+        url.searchParams.set('editId', editId);
+      } else {
+        sessionStorage.removeItem('admin_users_edit_id');
+        url.searchParams.delete('editId');
+      }
+    } else {
+      sessionStorage.removeItem('admin_users_view');
+      sessionStorage.removeItem('admin_users_edit_id');
+      url.searchParams.delete('view');
+      url.searchParams.delete('editId');
+    }
+    window.history.replaceState({}, '', url.pathname + url.search);
+  };
+
+  const loadEditUserById = async (userId) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        const fresh = data.user;
+        const avatarPath = fresh.avatar || '';
+        setEditingUser({
+          ...fresh,
+          id: fresh._id || fresh.id
+        });
+        setIsPinMasked(true);
+        setFormData({
+          name: fresh.name || '',
+          email: fresh.email || '',
+          phone: fresh.phone || '',
+          pin: ['•', '•', '•', '•'],
+          status: fresh.status || 'Active',
+          avatar: avatarPath ? (avatarPath.startsWith('http') || avatarPath.startsWith('data:') ? avatarPath : `${API_BASE}${avatarPath.startsWith('/') ? '' : '/'}${avatarPath}`) : '',
+          avatarFile: null
+        });
+        setFormErrors({});
+        setErrorMsg('');
+        setCurrentView('form');
+      }
+    } catch (err) {
+      console.error('Error loading user for edit on refresh:', err);
+    }
+  };
+
+  const loadViewUserById = async (userId) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        const fresh = data.user;
+        const avatarPath = fresh.avatar || '';
+        setViewingUser({
+          ...fresh,
+          id: fresh._id || fresh.id,
+          avatar: avatarPath ? (avatarPath.startsWith('http') || avatarPath.startsWith('data:') ? avatarPath : `${API_BASE}${avatarPath.startsWith('/') ? '' : '/'}${avatarPath}`) : ''
+        });
+      }
+    } catch (err) {
+      console.error('Error loading user for view modal on refresh:', err);
+    }
+  };
+
+  const closeViewUserModal = () => {
+    setViewingUser(null);
+    sessionStorage.removeItem('admin_users_view_id');
+    const url = new URL(window.location);
+    url.searchParams.delete('viewId');
+    window.history.replaceState({}, '', url.pathname + url.search);
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const viewParam = params.get('view') || sessionStorage.getItem('admin_users_view');
+    const editIdParam = params.get('editId') || sessionStorage.getItem('admin_users_edit_id');
+    const viewIdParam = params.get('viewId') || sessionStorage.getItem('admin_users_view_id');
+
+    if (viewParam === 'form') {
+      if (editIdParam) {
+        loadEditUserById(editIdParam);
+      } else {
+        handleOpenAddForm();
+      }
+    } else if (viewIdParam) {
+      loadViewUserById(viewIdParam);
+    }
+  }, []);
+
   // Handle Avatar Image Selection
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
@@ -160,12 +261,13 @@ const AdminUsers = () => {
     setIsPinMasked(false);
     setFormErrors({});
     setErrorMsg('');
-    setCurrentView('form');
+    setPersistedView('form');
   };
 
   const handleEdit = async (user) => {
+    const userId = user._id || user.id;
+    setPersistedView('form', userId);
     try {
-      const userId = user._id || user.id;
       const token = localStorage.getItem('adminToken');
       const res = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -190,7 +292,6 @@ const AdminUsers = () => {
       });
       setFormErrors({});
       setErrorMsg('');
-      setCurrentView('form');
     } catch (err) {
       console.error('Error fetching single user details for edit:', err);
       setEditingUser(user);
@@ -206,13 +307,17 @@ const AdminUsers = () => {
       });
       setFormErrors({});
       setErrorMsg('');
-      setCurrentView('form');
     }
   };
 
   const handleViewUser = async (user) => {
+    const userId = user._id || user.id;
+    sessionStorage.setItem('admin_users_view_id', userId);
+    const url = new URL(window.location);
+    url.searchParams.set('viewId', userId);
+    window.history.replaceState({}, '', url.pathname + url.search);
+
     try {
-      const userId = user._id || user.id;
       const token = localStorage.getItem('adminToken');
       const res = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -268,24 +373,16 @@ const AdminUsers = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Client Validation
+    // Basic empty check so empty inputs are flagged, but let API handle validation & duplicate checks
     const errors = {};
     if (!formData.name || !formData.name.trim()) {
       errors.name = 'Name is required';
-    } else if (!/^[a-zA-Z\s.\'-]+$/.test(formData.name.trim())) {
-      errors.name = 'Letters and dots only (no numbers)';
     }
-
     if (!formData.email || !formData.email.trim()) {
       errors.email = 'Email is required';
-    } else if (!formData.email.includes('@') || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      errors.email = 'Valid email with @ required';
     }
-
     if (!formData.phone || !formData.phone.trim()) {
       errors.phone = 'Phone number is required';
-    } else if (formData.phone.trim().length !== 10) {
-      errors.phone = 'Must be 10 digits';
     }
 
     let pinStr = formData.pin.join('');
@@ -295,7 +392,7 @@ const AdminUsers = () => {
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
-      showToast('Please fix highlighted field errors.', 'error');
+      showToast('Please fill out all required fields.', 'error');
       return;
     }
 
@@ -330,15 +427,32 @@ const AdminUsers = () => {
         body: bodyFormData
       });
       const data = await response.json();
+
       if (data.success) {
-        setCurrentView('list');
+        setPersistedView('list');
         setEditingUser(null);
         setFormData(defaultFormData);
         fetchUsers();
         showToast(data.message || (editingUser ? 'User updated successfully' : 'Admin user created successfully'), 'success');
         return;
       } else {
-        showToast(data.message || 'Failed to save user', 'error');
+        const backendMessage = data.message || 'Failed to save user';
+        const msgLower = backendMessage.toLowerCase();
+        
+        const backendErrors = {};
+        if (msgLower.includes('phone') || msgLower.includes('mobile') || msgLower.includes('number')) {
+          backendErrors.phone = backendMessage;
+        } else if (msgLower.includes('email')) {
+          backendErrors.email = backendMessage;
+        } else if (msgLower.includes('name')) {
+          backendErrors.name = backendMessage;
+        } else if (msgLower.includes('pin')) {
+          backendErrors.pin = backendMessage;
+        }
+
+        setFormErrors(backendErrors);
+        setErrorMsg(backendMessage);
+        showToast(backendMessage, 'error');
       }
     } catch (err) {
       console.error(err);
@@ -432,7 +546,7 @@ const AdminUsers = () => {
             Add Admin User
           </button>
         ) : (
-          <button className="btn-secondary-dark" onClick={() => setCurrentView('list')}>
+          <button className="btn-secondary-dark" onClick={() => { setPersistedView('list'); setEditingUser(null); }}>
             ← Back to Admin List
           </button>
         )}
@@ -662,10 +776,7 @@ const AdminUsers = () => {
                 {/* Row 1: Name * & Email * */}
                 <div className="form-row-2col">
                   <div className="form-group">
-                    <div className="label-with-error-row">
-                      <label>Name <span className="req-star">*</span></label>
-                      {formErrors.name && <span className="field-error-text">{formErrors.name}</span>}
-                    </div>
+                    <label style={{ marginBottom: '6px', display: 'block' }}>Name <span className="req-star">*</span></label>
                     <input
                       type="text"
                       placeholder="Enter Full Name"
@@ -678,13 +789,11 @@ const AdminUsers = () => {
                       }}
                       className={formErrors.name ? 'input-field-error' : ''}
                     />
+                    {formErrors.name && <span className="field-error-text">{formErrors.name}</span>}
                   </div>
 
                   <div className="form-group">
-                    <div className="label-with-error-row">
-                      <label>Email <span className="req-star">*</span></label>
-                      {formErrors.email && <span className="field-error-text">{formErrors.email}</span>}
-                    </div>
+                    <label style={{ marginBottom: '6px', display: 'block' }}>Email <span className="req-star">*</span></label>
                     <input
                       type="email"
                       placeholder="Enter Email Address"
@@ -696,16 +805,14 @@ const AdminUsers = () => {
                       }}
                       className={formErrors.email ? 'input-field-error' : ''}
                     />
+                    {formErrors.email && <span className="field-error-text">{formErrors.email}</span>}
                   </div>
                 </div>
 
                 {/* Row 2: Phone Number * & PIN - 4 Digits * */}
                 <div className="form-row-2col">
                   <div className="form-group">
-                    <div className="label-with-error-row">
-                      <label>Phone Number <span className="req-star">*</span></label>
-                      {formErrors.phone && <span className="field-error-text">{formErrors.phone}</span>}
-                    </div>
+                    <label style={{ marginBottom: '6px', display: 'block' }}>Phone Number <span className="req-star">*</span></label>
                     <input
                       type="text"
                       maxLength="10"
@@ -719,13 +826,11 @@ const AdminUsers = () => {
                       }}
                       className={formErrors.phone ? 'input-field-error' : ''}
                     />
+                    {formErrors.phone && <span className="field-error-text">{formErrors.phone}</span>}
                   </div>
 
                   <div className="form-group">
-                    <div className="label-with-error-row">
-                      <label>PIN - 4 Digits <span className="req-star">*</span></label>
-                      {formErrors.pin && <span className="field-error-text">{formErrors.pin}</span>}
-                    </div>
+                    <label style={{ marginBottom: '6px', display: 'block' }}>PIN - 4 Digits <span className="req-star">*</span></label>
                     <div className="pin-inputs-flex">
                       {[0, 1, 2, 3].map(idx => {
                         const displayVal = isPinMasked ? '•' : (formData.pin[idx] || '');
@@ -767,6 +872,7 @@ const AdminUsers = () => {
                         );
                       })}
                     </div>
+                    {formErrors.pin && <span className="field-error-text">{formErrors.pin}</span>}
                   </div>
                 </div>
 
@@ -811,7 +917,8 @@ const AdminUsers = () => {
                 onClick={() => {
                   setFormErrors({});
                   setErrorMsg('');
-                  setCurrentView('list');
+                  setPersistedView('list');
+                  setEditingUser(null);
                 }}
                 disabled={loading}
               >
@@ -830,11 +937,11 @@ const AdminUsers = () => {
           PROFILE IMAGE / USER DETAILS POP-UP MODAL
          ========================================================================= */}
       {viewingUser && (
-        <div className="admin-modal-overlay" onClick={() => setViewingUser(null)}>
+        <div className="admin-modal-overlay" onClick={closeViewUserModal}>
           <div className="admin-modal" style={{ maxWidth: '440px', padding: '28px 24px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header" style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', marginBottom: '20px' }}>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>User Profile Picture</h3>
-              <button className="collapse-btn" onClick={() => setViewingUser(null)}>✕</button>
+              <button className="collapse-btn" onClick={closeViewUserModal}>✕</button>
             </div>
 
             <div style={{ padding: '6px 0' }}>
