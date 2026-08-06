@@ -101,15 +101,25 @@ const AdminEnquiries = () => {
     sessionStorage.removeItem('admin_enquiries_view_id');
     const url = new URL(window.location);
     url.searchParams.delete('viewId');
-    window.history.replaceState({}, '', url.pathname + url.search);
+    window.history.pushState({}, '', url.pathname + url.search);
   };
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const viewIdParam = params.get('viewId') || sessionStorage.getItem('admin_enquiries_view_id');
-    if (viewIdParam) {
-      loadViewEnquiryById(viewIdParam);
-    }
+    const syncViewStateFromURL = () => {
+      const params = new URLSearchParams(window.location.search);
+      const viewIdParam = params.get('viewId');
+      if (viewIdParam) {
+        loadViewEnquiryById(viewIdParam);
+      } else {
+        setViewingEnquiry(null);
+        sessionStorage.removeItem('admin_enquiries_view_id');
+      }
+    };
+
+    syncViewStateFromURL();
+
+    window.addEventListener('popstate', syncViewStateFromURL);
+    return () => window.removeEventListener('popstate', syncViewStateFromURL);
   }, []);
 
   // Server-Side Pagination Calculations
@@ -291,13 +301,19 @@ const AdminEnquiries = () => {
 
           <div className="table-search-group">
             <label>Search:</label>
-            <input
-              type="text"
-              className="search-input-field"
-              placeholder="Search enquiry..."
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            />
+            <div className="search-input-wrapper">
+              <svg className="search-icon-inside" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input
+                type="text"
+                className="search-input-field"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              />
+            </div>
           </div>
         </div>
 

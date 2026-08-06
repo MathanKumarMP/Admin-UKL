@@ -1098,14 +1098,29 @@ body {
   gap: 8px;
 }
 
+.search-input-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.search-icon-inside {
+  position: absolute;
+  left: 10px;
+  color: #64748b;
+  pointer-events: none;
+  z-index: 1;
+}
+
 .search-input-field {
   border: 1px solid #cbd5e0;
   border-radius: 6px;
-  padding: 6px 12px;
+  padding: 6px 12px 6px 32px !important;
   font-size: 13px;
   outline: none;
-  min-width: 180px;
-  transition: border-color 0.2s ease;
+  min-width: 190px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background-color: #ffffff;
 }
 
 .search-input-field::placeholder {
@@ -1660,6 +1675,19 @@ body {
   overflow-wrap: break-word !important;
   word-wrap: break-word !important;
   max-width: 100% !important;
+}
+
+/* Textarea Auto-wrap & Vertical-Only Resize Rules */
+.form-group textarea,
+textarea {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  resize: vertical !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  word-wrap: break-word !important;
+  white-space: pre-wrap !important;
 }
 
 .view-article-full-page-body * {

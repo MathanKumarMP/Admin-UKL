@@ -110,7 +110,8 @@ const AdminUsers = () => {
       url.searchParams.delete('view');
       url.searchParams.delete('editId');
     }
-    window.history.replaceState({}, '', url.pathname + url.search);
+    // Use pushState so Chrome Back Button (<-) navigates from Form view back to List view
+    window.history.pushState({}, '', url.pathname + url.search);
   };
 
   const loadEditUserById = async (userId) => {
@@ -172,24 +173,41 @@ const AdminUsers = () => {
     sessionStorage.removeItem('admin_users_view_id');
     const url = new URL(window.location);
     url.searchParams.delete('viewId');
-    window.history.replaceState({}, '', url.pathname + url.search);
+    window.history.pushState({}, '', url.pathname + url.search);
   };
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const viewParam = params.get('view') || sessionStorage.getItem('admin_users_view');
-    const editIdParam = params.get('editId') || sessionStorage.getItem('admin_users_edit_id');
-    const viewIdParam = params.get('viewId') || sessionStorage.getItem('admin_users_view_id');
+    const syncViewStateFromURL = () => {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get('view');
+      const editIdParam = params.get('editId');
+      const viewIdParam = params.get('viewId');
 
-    if (viewParam === 'form') {
-      if (editIdParam) {
-        loadEditUserById(editIdParam);
+      if (viewParam === 'form') {
+        if (editIdParam) {
+          loadEditUserById(editIdParam);
+        } else {
+          setEditingUser(null);
+          setFormData(defaultFormData);
+          setIsPinMasked(false);
+          setCurrentView('form');
+        }
+      } else if (viewIdParam) {
+        loadViewUserById(viewIdParam);
       } else {
-        handleOpenAddForm();
+        setCurrentView('list');
+        setEditingUser(null);
+        setViewingUser(null);
+        sessionStorage.removeItem('admin_users_view');
+        sessionStorage.removeItem('admin_users_edit_id');
+        sessionStorage.removeItem('admin_users_view_id');
       }
-    } else if (viewIdParam) {
-      loadViewUserById(viewIdParam);
-    }
+    };
+
+    syncViewStateFromURL();
+
+    window.addEventListener('popstate', syncViewStateFromURL);
+    return () => window.removeEventListener('popstate', syncViewStateFromURL);
   }, []);
 
   // Handle Avatar Image Selection
@@ -392,7 +410,17 @@ const AdminUsers = () => {
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
-      showToast('Please fill out all required fields.', 'error');
+      setTimeout(() => {
+        const firstErrorEl = document.querySelector('.input-field-error, .field-error-text');
+        if (firstErrorEl) {
+          firstErrorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const container = firstErrorEl.closest('.form-group') || firstErrorEl.parentElement;
+          const targetInput = container ? container.querySelector('input, textarea, select') : null;
+          if (targetInput && typeof targetInput.focus === 'function') {
+            targetInput.focus();
+          }
+        }
+      }, 60);
       return;
     }
 
@@ -581,16 +609,22 @@ const AdminUsers = () => {
 
             <div className="table-search-group">
               <label>Search:</label>
-              <input
-                type="text"
-                className="search-input-field"
-                placeholder="Search user..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
-              />
+              <div className="search-input-wrapper">
+                <svg className="search-icon-inside" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input
+                  type="text"
+                  className="search-input-field"
+                  placeholder="Search..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
             </div>
           </div>
 

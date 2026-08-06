@@ -111,7 +111,8 @@ const AdminBanners = () => {
       url.searchParams.delete('view');
       url.searchParams.delete('editId');
     }
-    window.history.replaceState({}, '', url.pathname + url.search);
+    // Use pushState so Chrome Back Button (<-) navigates from Form view back to List view
+    window.history.pushState({}, '', url.pathname + url.search);
   };
 
   const loadEditBannerById = async (bannerId) => {
@@ -138,7 +139,7 @@ const AdminBanners = () => {
           status: fresh.status || 'Active',
           description: fresh.description || '',
           img: imgPath ? (imgPath.startsWith('http') || imgPath.startsWith('data:') ? imgPath : `${API_BASE}${imgPath.startsWith('/') ? '' : '/'}${imgPath}`) : '',
-          fileName: imgPath ? imgPath.split('/').pop() : 'banner_image.png'
+          fileName: imgPath ? imgPath.split('/').pop() : 'No file chosen'
         });
         setCurrentView('form');
       }
@@ -173,24 +174,41 @@ const AdminBanners = () => {
     sessionStorage.removeItem('admin_banners_view_id');
     const url = new URL(window.location);
     url.searchParams.delete('viewId');
-    window.history.replaceState({}, '', url.pathname + url.search);
+    window.history.pushState({}, '', url.pathname + url.search);
   };
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const viewParam = params.get('view') || sessionStorage.getItem('admin_banners_view');
-    const editIdParam = params.get('editId') || sessionStorage.getItem('admin_banners_edit_id');
-    const viewIdParam = params.get('viewId') || sessionStorage.getItem('admin_banners_view_id');
+    const syncViewStateFromURL = () => {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get('view');
+      const editIdParam = params.get('editId');
+      const viewIdParam = params.get('viewId');
 
-    if (viewParam === 'form') {
-      if (editIdParam) {
-        loadEditBannerById(editIdParam);
+      if (viewParam === 'form') {
+        if (editIdParam) {
+          loadEditBannerById(editIdParam);
+        } else {
+          setEditingBanner(null);
+          setFormData(defaultFormData);
+          setSelectedFile(null);
+          setCurrentView('form');
+        }
+      } else if (viewIdParam) {
+        loadViewBannerById(viewIdParam);
       } else {
-        handleOpenAddForm();
+        setCurrentView('list');
+        setEditingBanner(null);
+        setViewingBanner(null);
+        sessionStorage.removeItem('admin_banners_view');
+        sessionStorage.removeItem('admin_banners_edit_id');
+        sessionStorage.removeItem('admin_banners_view_id');
       }
-    } else if (viewIdParam) {
-      loadViewBannerById(viewIdParam);
-    }
+    };
+
+    syncViewStateFromURL();
+
+    window.addEventListener('popstate', syncViewStateFromURL);
+    return () => window.removeEventListener('popstate', syncViewStateFromURL);
   }, []);
 
   // Handle File Input Change
@@ -369,6 +387,17 @@ const AdminBanners = () => {
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
+      setTimeout(() => {
+        const firstErrorEl = document.querySelector('.input-field-error, .field-error-text');
+        if (firstErrorEl) {
+          firstErrorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const container = firstErrorEl.closest('.form-group') || firstErrorEl.parentElement;
+          const targetInput = container ? container.querySelector('input, textarea, select') : null;
+          if (targetInput && typeof targetInput.focus === 'function') {
+            targetInput.focus();
+          }
+        }
+      }, 60);
       return;
     }
 
@@ -477,13 +506,19 @@ const AdminBanners = () => {
 
             <div className="table-search-group">
               <label>Search:</label>
-              <input
-                type="text"
-                className="search-input-field"
-                placeholder="Search banner..."
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              />
+              <div className="search-input-wrapper">
+                <svg className="search-icon-inside" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input
+                  type="text"
+                  className="search-input-field"
+                  placeholder="Search..."
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                />
+              </div>
             </div>
           </div>
 
@@ -494,7 +529,7 @@ const AdminBanners = () => {
                 <tr>
                   <th style={{ width: '80px', textAlign: 'center' }}>S.No</th>
                   <th style={{ width: '140px', textAlign: 'center' }}>Media</th>
-                  <th style={{ textAlign: 'center' }}>Page Name</th>
+                  <th style={{ textAlign: 'center' }}>Title</th>
                   <th style={{ width: '130px', textAlign: 'center' }}>Status</th>
                   <th style={{ width: '130px', textAlign: 'center' }}>Action</th>
                 </tr>
@@ -520,7 +555,7 @@ const AdminBanners = () => {
                         {item.img ? (
                           <img 
                             src={item.img} 
-                            alt={item.pageName} 
+                            alt={item.title || item.pageName} 
                             className="table-thumb-img banner-media-preview" 
                             style={{ display: 'inline-block' }} 
                             onError={(e) => {
@@ -532,8 +567,8 @@ const AdminBanners = () => {
                           <span style={{ fontSize: '12px', color: '#64748b' }}>No Image</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <span className="page-name-tag">{item.pageName}</span>
+                      <td style={{ textAlign: 'center', fontWeight: '700', color: '#0f172a' }}>
+                        {item.title || item.pageName}
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         <span className={`status-pill ${item.status === 'Active' ? 'published' : 'inactive'}`}>

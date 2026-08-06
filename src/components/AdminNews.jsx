@@ -186,7 +186,8 @@ const AdminNews = () => {
       url.searchParams.delete('view');
       url.searchParams.delete('editId');
     }
-    window.history.replaceState({}, '', url.pathname + url.search);
+    // Use pushState so Chrome Back Button (<-) navigates from Form/View page back to List page
+    window.history.pushState({}, '', url.pathname + url.search);
   };
 
   const loadEditArticleById = async (articleId) => {
@@ -249,26 +250,43 @@ const AdminNews = () => {
     const url = new URL(window.location);
     url.searchParams.delete('viewId');
     url.searchParams.delete('view');
-    window.history.replaceState({}, '', url.pathname + url.search);
+    window.history.pushState({}, '', url.pathname + url.search);
   };
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const viewParam = params.get('view') || sessionStorage.getItem('admin_news_view');
-    const editIdParam = params.get('editId') || sessionStorage.getItem('admin_news_edit_id');
-    const viewIdParam = params.get('viewId') || sessionStorage.getItem('admin_news_view_id');
+    const syncViewStateFromURL = () => {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get('view');
+      const editIdParam = params.get('editId');
+      const viewIdParam = params.get('viewId');
 
-    if (viewParam === 'form') {
-      if (editIdParam) {
-        loadEditArticleById(editIdParam);
+      if (viewParam === 'form') {
+        if (editIdParam) {
+          loadEditArticleById(editIdParam);
+        } else {
+          setEditingArticle(null);
+          setFormData(defaultFormData);
+          setSelectedFile(null);
+          setCurrentView('form');
+        }
+      } else if (viewParam === 'view' || viewIdParam) {
+        if (viewIdParam) {
+          loadViewArticleById(viewIdParam);
+        }
       } else {
-        handleOpenAddForm();
+        setCurrentView('list');
+        setEditingArticle(null);
+        setViewingArticle(null);
+        sessionStorage.removeItem('admin_news_view');
+        sessionStorage.removeItem('admin_news_edit_id');
+        sessionStorage.removeItem('admin_news_view_id');
       }
-    } else if (viewParam === 'view' || viewIdParam) {
-      if (viewIdParam) {
-        loadViewArticleById(viewIdParam);
-      }
-    }
+    };
+
+    syncViewStateFromURL();
+
+    window.addEventListener('popstate', syncViewStateFromURL);
+    return () => window.removeEventListener('popstate', syncViewStateFromURL);
   }, []);
 
   useEffect(() => {
@@ -427,7 +445,17 @@ const AdminNews = () => {
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
-      showToast('Please fill out all required fields marked with *', 'error');
+      setTimeout(() => {
+        const firstErrorEl = document.querySelector('.input-field-error, .field-error-text');
+        if (firstErrorEl) {
+          firstErrorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const container = firstErrorEl.closest('.form-group') || firstErrorEl.parentElement;
+          const targetInput = container ? container.querySelector('input, textarea, select') : null;
+          if (targetInput && typeof targetInput.focus === 'function') {
+            targetInput.focus();
+          }
+        }
+      }, 60);
       return;
     }
 
@@ -810,13 +838,19 @@ const AdminNews = () => {
 
             <div className="table-search-group">
               <label>Search:</label>
-              <input
-                type="text"
-                className="search-input-field"
-                placeholder="Search news..."
-                value={searchTerm}
-                onChange={handleSearchChange}
-              />
+              <div className="search-input-wrapper">
+                <svg className="search-icon-inside" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input
+                  type="text"
+                  className="search-input-field"
+                  placeholder="Search..."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                />
+              </div>
             </div>
           </div>
 
@@ -1025,11 +1059,51 @@ const AdminNews = () => {
                           'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount', 'emoticons'
                         ],
                         toolbar: 'undo redo | blocks | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | image media link print preview | forecolor backcolor emoticons',
-                        content_style: 'body { font-family: "Plus Jakarta Sans", Inter, Helvetica, Arial, sans-serif; font-size: 14px; color: #0f172a; line-height: 1.6; word-break: break-word; overflow-wrap: break-word; word-wrap: break-word; white-space: pre-wrap; max-width: 100%; } ul, ol { padding-left: 24px; } p { margin-bottom: 8px; }',
+                        content_style: 'body { font-family: "Plus Jakarta Sans", Inter, Helvetica, Arial, sans-serif; font-size: 14px; color: #0f172a; line-height: 1.6; word-break: break-word; overflow-wrap: break-word; word-wrap: break-word; white-space: pre-wrap; max-width: 100%; min-height: 300px; cursor: text; } ul, ol { padding-left: 24px; } p { margin-bottom: 8px; }',
                         branding: false,
                         promotion: false,
                         resize: true,
-                        statusbar: true
+                        statusbar: true,
+                        setup: (editor) => {
+                          const dismissTinyMCEPopups = () => {
+                            try {
+                              // 1. Dispatch ESC key inside iframe window & parent window to close floating menus
+                              const escEvent = new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, which: 27, bubbles: true });
+                              if (editor.getWin()) editor.getWin().dispatchEvent(escEvent);
+                              document.dispatchEvent(escEvent);
+                            } catch (e) {}
+
+                            // 2. Toggle active open toolbar button (e.g. More... button)
+                            const container = editor.getContainer();
+                            if (container) {
+                              const activeBtns = container.querySelectorAll('.tox-tbtn[aria-expanded="true"], .tox-tbtn--enabled');
+                              activeBtns.forEach(btn => {
+                                try { btn.click(); } catch (e) {}
+                              });
+                            }
+
+                            // 3. Hide floating overflow drawers and menus from DOM
+                            const popups = document.querySelectorAll('.tox-pop, .tox-toolbar__overflow, .tox-selected-menu, .tox-menu');
+                            popups.forEach(pop => {
+                              pop.style.display = 'none';
+                            });
+                          };
+
+                          editor.on('init', () => {
+                            const doc = editor.getDoc();
+                            const body = editor.getBody();
+                            if (doc) {
+                              doc.addEventListener('mousedown', dismissTinyMCEPopups, true);
+                              doc.addEventListener('click', dismissTinyMCEPopups, true);
+                            }
+                            if (body) {
+                              body.addEventListener('mousedown', dismissTinyMCEPopups, true);
+                              body.addEventListener('click', dismissTinyMCEPopups, true);
+                            }
+                          });
+
+                          editor.on('click mousedown focus ExecCommand NodeChange', dismissTinyMCEPopups);
+                        }
                       }}
                     />
                   </div>
@@ -1065,6 +1139,7 @@ const AdminNews = () => {
                     <textarea 
                       placeholder="Brief search engine description (150-160 characters)"
                       rows="3"
+                      style={{ resize: 'vertical', width: '100%', maxWidth: '100%' }}
                       value={formData.metaDescription}
                       onChange={(e) => setFormData({ ...formData, metaDescription: e.target.value })}
                     ></textarea>
@@ -1117,6 +1192,7 @@ const AdminNews = () => {
                   <textarea 
                     placeholder="Short description displayed on card"
                     rows="3"
+                    style={{ resize: 'vertical', width: '100%', maxWidth: '100%' }}
                     value={formData.shortDescription}
                     onChange={(e) => {
                       setFormData({ ...formData, shortDescription: e.target.value });
@@ -1464,7 +1540,7 @@ const AdminNews = () => {
                 <img 
                   src={viewingArticle.thumbnail} 
                   alt={viewingArticle.title} 
-                  style={{ width: '100%', maxHeight: '320px', objectFit: 'contain' }}
+                  style={{ width: '100%', height: '100%', maxHeight: '340px', objectFit: 'cover', borderRadius: '8px' }}
                   onError={(e) => {
                     e.target.onerror = null;
                     e.target.src = newsImg1;
