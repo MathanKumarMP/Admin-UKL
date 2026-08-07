@@ -236,7 +236,7 @@ const AdminEnquiries = () => {
       {/* Header Bar matching UKL Theme */}
       <div className="banner-list-header-bar">
         <div>
-          <h2 className="banner-header-title">Customer Enquiries Management</h2>
+          <h2 className="banner-header-title">Customer Enquiries</h2>
         </div>
 
         <div>

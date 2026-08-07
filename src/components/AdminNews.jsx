@@ -455,6 +455,9 @@ const AdminNews = () => {
     if (!formData.blogDetails || !formData.blogDetails.trim()) {
       errors.blogDetails = 'Details description is required';
     }
+    if (formData.author && /[^a-zA-Z\s.'-]/.test(formData.author)) {
+      errors.author = "Author name can contain only letters, spaces, periods (.), hyphens (-), and apostrophes ('). Numbers and special characters are not allowed.";
+    }
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
@@ -805,26 +808,39 @@ const AdminNews = () => {
       <ToastNotification toast={toast} onClose={() => setToast(null)} />
 
       {/* Header Bar matching View Mode */}
-      {currentView === 'list' && (
-        <div className="blog-post-header-bar">
+      <div className="banner-list-header-bar" style={{ marginBottom: '24px' }}>
+        {currentView === 'list' ? (
           <div className="title-section">
-            <h2 className="header-main-title" style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a' }}>Blog Post</h2>
+            <h2 className="header-main-title" style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a' }}>News List</h2>
           </div>
+        ) : (
+          <div 
+            className="back-title-link-group" 
+            onClick={() => { setPersistedView('list'); setEditingArticle(null); setViewingArticle(null); }}
+            title="Click to go back to News List"
+          >
+            {/* <span className="chrome-back-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+              </svg>
+            </span> */}
+            <h2 className="header-main-title" style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: 0 }}>News List</h2>
+          </div>
+        )}
 
+        {currentView === 'list' ? (
           <div className="header-action-buttons">
-            {/* <button className="btn-coral-tag" onClick={() => { setCurrentView('tags'); setShowTagForm(false); }}>
-              Add Tags
-            </button>
-            <button className="btn-peach-category" onClick={() => { setCurrentView('categories'); setShowCategoryForm(false); }}>
-              Add Category
-            </button> */}
-
             <button className="btn-vibrant-add" onClick={handleOpenAddForm}>
-              <span className="plus-icon">+</span> Add
+              <span className="plus-icon">+</span> Add News Article
             </button>
           </div>
-        </div>
-      )}
+        ) : (
+          <button className="btn-secondary-dark" onClick={() => { setPersistedView('list'); setEditingArticle(null); setViewingArticle(null); }}>
+            ← Back to News List
+          </button>
+        )}
+      </div>
 
       {/* =========================================================================
           VIEW MODE 1: TABLE LIST VIEW
@@ -1069,7 +1085,7 @@ const AdminNews = () => {
                         ],
                         toolbar: 'undo redo | blocks | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | image media link print preview | forecolor backcolor emoticons',
                         toolbar_mode: 'wrap',
-                        content_style: 'body { font-family: "Plus Jakarta Sans", Inter, Helvetica, Arial, sans-serif; font-size: 14px; color: #0f172a; line-height: 1.6; word-break: break-word; overflow-wrap: break-word; word-wrap: break-word; white-space: pre-wrap; max-width: 100%; min-height: 300px; cursor: text; } ul, ol { padding-left: 24px; } p { margin-bottom: 8px; }',
+                        content_style: 'body.mce-content-body, body { font-family: "Plus Jakarta Sans", Inter, Helvetica, Arial, sans-serif; font-size: 14px; color: #0f172a; line-height: 1.6; word-break: break-word; overflow-wrap: break-word; word-wrap: break-word; white-space: pre-wrap; max-width: 100%; min-height: 141px !important; box-sizing: border-box !important; margin: 0 !important; padding: 12px !important; overflow-y: auto !important; cursor: text; } html { overflow-y: auto !important; } ul, ol { padding-left: 24px; } p { margin-top: 0; margin-bottom: 8px; }',
                         branding: false,
                         promotion: false,
                         resize: true,
@@ -1109,7 +1125,7 @@ const AdminNews = () => {
                     <textarea 
                       placeholder="Brief search engine description (150-160 characters)"
                       rows="3"
-                      style={{ resize: 'vertical', width: '100%', maxWidth: '100%' }}
+                      style={{ resize: 'vertical', width: '100%', maxWidth: '100%', overflow: 'auto' }}
                       value={formData.metaDescription}
                       onChange={(e) => setFormData({ ...formData, metaDescription: e.target.value })}
                     ></textarea>
@@ -1162,7 +1178,7 @@ const AdminNews = () => {
                   <textarea 
                     placeholder="Short description displayed on card"
                     rows="3"
-                    style={{ resize: 'vertical', width: '100%', maxWidth: '100%' }}
+                    style={{ resize: 'vertical', width: '100%', maxWidth: '100%', overflow: 'auto' }}
                     value={formData.shortDescription}
                     onChange={(e) => {
                       setFormData({ ...formData, shortDescription: e.target.value });
@@ -1190,8 +1206,25 @@ const AdminNews = () => {
                     type="text"
                     placeholder="Enter Author Name (e.g. UKL Team)"
                     value={formData.author}
-                    onChange={(e) => setFormData({ ...formData, author: e.target.value })}
+                    onChange={(e) => {
+                      const rawVal = e.target.value;
+                      const hasInvalidChar = /[^a-zA-Z\s.'-]/.test(rawVal);
+                      const filteredVal = rawVal.replace(/[^a-zA-Z\s.'-]/g, '');
+                      setFormData(prev => ({ ...prev, author: filteredVal }));
+                      if (hasInvalidChar) {
+                        setFormErrors(prev => ({
+                          ...prev,
+                          author: "Author name can contain only letters, spaces, periods (.), hyphens (-), and apostrophes ('). Numbers and special characters are not allowed."
+                        }));
+                      } else {
+                        if (formErrors.author) {
+                          setFormErrors(prev => ({ ...prev, author: '' }));
+                        }
+                      }
+                    }}
+                    className={formErrors.author ? 'input-field-error' : ''}
                   />
+                  {formErrors.author && <span className="field-error-text">{formErrors.author}</span>}
                 </div>
 
                 {/* Category selection - Hidden as requested */}
@@ -1262,8 +1295,8 @@ const AdminNews = () => {
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                   >
-                    <option value="Active">Active / Published</option>
-                    <option value="Inactive">Inactive / Draft</option>
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
                   </select>
                 </div>
 
@@ -1276,7 +1309,7 @@ const AdminNews = () => {
                 Cancel
               </button>
               <button type="submit" className="btn-save-banner-filled" disabled={loading}>
-                {loading ? 'Saving Article...' : 'Publish Article'}
+                {loading ? (editingArticle ? 'Updating...' : 'Saving Article...') : (editingArticle ? 'Update' : 'Publish Article')}
               </button>
             </div>
           </form>

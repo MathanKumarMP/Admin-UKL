@@ -543,9 +543,25 @@ const AdminGallery = () => {
 
       {/* Header Bar matching UKL Theme */}
       <div className="banner-list-header-bar">
-        <div>
-          <h2 className="banner-header-title">Gallery Management</h2>
-        </div>
+        {currentView === 'list' ? (
+          <div>
+            <h2 className="banner-header-title">Gallery List</h2>
+          </div>
+        ) : (
+          <div 
+            className="back-title-link-group" 
+            onClick={() => { setPersistedView('list'); setEditingItem(null); }}
+            title="Click to go back to Gallery List"
+          >
+            {/* <span className="chrome-back-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+              </svg>
+            </span> */}
+            <h2 className="banner-header-title" style={{ margin: 0 }}>Gallery List</h2>
+          </div>
+        )}
 
         {currentView === 'list' ? (
           <button className="btn-save-banner-filled" onClick={handleOpenAddForm}>
@@ -951,7 +967,7 @@ const AdminGallery = () => {
                 Cancel
               </button>
               <button type="submit" className="btn-save-banner-filled" disabled={loading}>
-                {loading ? 'Saving...' : 'Save Gallery'}
+                {loading ? (editingItem ? 'Updating...' : 'Saving...') : (editingItem ? 'Update' : 'Save Gallery')}
               </button>
             </div>
 

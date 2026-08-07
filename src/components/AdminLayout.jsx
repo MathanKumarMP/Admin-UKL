@@ -344,7 +344,7 @@ const AdminLayout = ({ onLogout }) => {
       {/* Admin Footer Bar */}
       <footer className="admin-app-footer">
         <div>
-          © Copyright 2025 <a href="/banners" onClick={(e) => { e.preventDefault(); handleModuleChange('banners'); }} className="admin-footer-company-link">UKL Instruments</a>. All rights reserved.
+          © Copyright 2026 <a href="/banners" onClick={(e) => { e.preventDefault(); handleModuleChange('banners'); }} className="admin-footer-company-link">UKL Instruments</a>. All rights reserved.
         </div>
         <div>
           Designed & Developed by <a href="https://www.oceansoftwares.com/" target="_blank" rel="noopener noreferrer" className="admin-footer-developer-link">Ocean Softwares Private Limited</a>

@@ -558,13 +558,24 @@ const AdminUsers = () => {
 
       {/* Top Header Bar */}
       <div className="banner-list-header-bar">
-        <h2 className="banner-header-title">
-          {currentView === 'list'
-            ? 'Admin Users Management'
-            : editingUser
-            ? 'Edit Admin User'
-            : 'Create Admin User'}
-        </h2>
+        {currentView === 'list' ? (
+          <h2 className="banner-header-title">Admin Users</h2>
+        ) : (
+          <div 
+            className="back-title-link-group" 
+            onClick={() => { setPersistedView('list'); setEditingUser(null); }}
+            title="Click to go back to Admin Users List"
+          >
+            {/* <span className="chrome-back-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+              </svg>
+            </span> */}
+            <h2 className="banner-header-title" style={{ margin: 0 }}>Admin Users List</h2>
+          </div>
+        )}
+
         {currentView === 'list' ? (
           <button className="btn-banner-add" onClick={handleOpenAddForm}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -906,7 +917,23 @@ const AdminUsers = () => {
                               }
                               setFocusedPinIndex(idx);
                             }}
-                            onBlur={() => setFocusedPinIndex(null)}
+                            onBlur={() => {
+                              setFocusedPinIndex(null);
+                              setTimeout(() => {
+                                const activeEl = document.activeElement;
+                                const isStillInPinGroup = activeEl && activeEl.id && activeEl.id.startsWith('pin-input-');
+                                if (!isStillInPinGroup) {
+                                  setFormData(prev => {
+                                    const currentPinStr = (prev.pin || []).join('').trim();
+                                    if (editingUser && !currentPinStr) {
+                                      setIsPinMasked(true);
+                                      return { ...prev, pin: ['•', '•', '•', '•'] };
+                                    }
+                                    return prev;
+                                  });
+                                }
+                              }, 50);
+                            }}
                           />
                         );
                       })}
@@ -921,20 +948,20 @@ const AdminUsers = () => {
                     <label style={{ marginBottom: '8px', display: 'block', fontWeight: 600 }}>Status</label>
                     <div className="status-pills-radio-group">
                       <div
-                        className={`status-pill-option ${formData.status === 'Active' ? 'active' : ''}`}
+                        className={`status-pill-option ${formData.status === 'Active' ? 'active' : 'unselected'}`}
                         onClick={() => setFormData({ ...formData, status: 'Active' })}
                       >
-                        <div className={`status-pill-checkbox ${formData.status === 'Active' ? '' : 'inactive'}`}>
+                        <div className={`status-pill-checkbox ${formData.status === 'Active' ? 'active' : 'unselected'}`}>
                           {formData.status === 'Active' && '✓'}
                         </div>
                         <span>Active</span>
                       </div>
 
                       <div
-                        className={`status-pill-option ${formData.status === 'Inactive' ? 'inactive' : ''}`}
+                        className={`status-pill-option ${formData.status === 'Inactive' ? 'inactive-selected' : 'unselected'}`}
                         onClick={() => setFormData({ ...formData, status: 'Inactive' })}
                       >
-                        <div className={`status-pill-checkbox ${formData.status === 'Inactive' ? '' : 'inactive'}`}>
+                        <div className={`status-pill-checkbox ${formData.status === 'Inactive' ? 'inactive-selected' : 'unselected'}`}>
                           {formData.status === 'Inactive' && '✓'}
                         </div>
                         <span>Inactive</span>
@@ -964,7 +991,7 @@ const AdminUsers = () => {
                 Cancel
               </button>
               <button type="submit" className="btn-save-navy-filled" disabled={loading}>
-                {loading ? 'Saving...' : 'Save'}
+                {loading ? (editingUser ? 'Updating...' : 'Saving...') : (editingUser ? 'Update' : 'Save')}
               </button>
             </div>
 
