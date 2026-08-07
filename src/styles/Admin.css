@@ -3296,7 +3296,7 @@ textarea {
   transform: scale(0.95);
 }
 
-/* Admin Panel Footer Link Hover Color (#60a5fa) */
+/* Admin Panel Footer Link Styling */
 .admin-app-footer {
   background-color: #ffffff;
   color: #475569;
@@ -3311,7 +3311,6 @@ textarea {
   margin-top: auto;
 }
 
-.admin-footer-company-link,
 .admin-footer-developer-link {
   color: #0f172a !important;
   font-weight: 700 !important;
@@ -3319,8 +3318,7 @@ textarea {
   transition: color 0.2s ease, text-decoration 0.2s ease;
 }
 
-.admin-footer-company-link:hover,
 .admin-footer-developer-link:hover {
-  color: #60a5fa !important;
+  color: #0f172a !important;
   text-decoration: underline !important;
 }
